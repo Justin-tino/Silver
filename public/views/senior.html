@@ -1,0 +1,2240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Senior Citizen Portal | SilverCare</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        :root {
+            --primary-gradient: linear-gradient(135deg, #1e40af, #3b82f6);
+            --pension-gradient: linear-gradient(135deg, #10b981, #059669);
+            --priority-gradient: linear-gradient(135deg, #8b5cf6, #6366f1);
+            --sidebar-green: #00b050;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --bg-light: #f8fafc;
+            --border-color: #e2e8f0;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background-color: #f1f5f9;
+            color: var(--text-main);
+            min-height: 100vh;
+        }
+
+        /* Layout Grid */
+        .portal-layout {
+            display: flex;
+            min-height: calc(100vh - 100px);
+        }
+
+        /* Sidebar - Green background as shown in screenshots */
+        .sidebar {
+            width: 260px;
+            background-color: var(--sidebar-green);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+            box-shadow: 4px 0 15px rgba(0, 0, 0, 0.05);
+        }
+
+        .sidebar-menu-title {
+            padding: 25px 20px 10px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            opacity: 0.9;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            margin-bottom: 15px;
+        }
+
+        .sidebar-links {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding: 0 12px;
+        }
+
+        .sidebar-link {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            color: rgba(255, 255, 255, 0.9);
+            text-decoration: none;
+            font-weight: 500;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+
+        .sidebar-link:hover {
+            background-color: rgba(255, 255, 255, 0.15);
+            color: white;
+            padding-left: 20px;
+        }
+
+        .sidebar-link.active {
+            background-color: rgba(255, 255, 255, 0.25);
+            color: white;
+            font-weight: 600;
+        }
+
+        /* Main Window */
+        .main-window {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+
+        /* Header - Styled EXACTLY like employee/admin header */
+        .portal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 40px;
+            background: white;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.03);
+            height: 100px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            border-bottom: 1px solid #f1f5f9;
+        }
+
+        /* Button-specific overrides for senior nav pills (since we use <button> not <a>) */
+        .nav-pill {
+            border: none;
+            background: transparent;
+        }
+
+        /* Content Container */
+        .portal-content {
+            padding: 30px 40px;
+            flex: 1;
+            overflow-y: auto;
+            max-width: 1400px;
+            width: 100%;
+            margin: 0 auto;
+        }
+
+        /* Tab Content panels */
+        .tab-panel {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .tab-panel.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Dashboard Stat Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02), 0 2px 4px -1px rgba(0,0,0,0.01);
+            border: 1px solid rgba(226, 232, 240, 0.8);
+        }
+
+        .stat-icon-wrapper {
+            width: 54px;
+            height: 54px;
+            border-radius: 12px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.5rem;
+            flex-shrink: 0;
+        }
+
+        .stat-icon-green { background: #dcfce7; color: #22c55e; }
+        .stat-orange { background: #ffedd5; color: #f97316; }
+        .stat-purple { background: #f3e8ff; color: #a855f7; }
+
+        .stat-details {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .stat-label {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .stat-value {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+
+        /* Large Action Blocks */
+        .dashboard-row-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+
+        @media (max-width: 900px) {
+            .dashboard-row-2 {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .pension-block {
+            background: var(--pension-gradient);
+            color: white;
+            border-radius: 20px;
+            padding: 30px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 8px 20px rgba(16, 185, 129, 0.15);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .block-text h4 {
+            font-size: 1rem;
+            font-weight: 500;
+            opacity: 0.9;
+            margin-bottom: 5px;
+        }
+
+        .block-text h2 {
+            font-size: 2.2rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .block-text p {
+            font-size: 1.1rem;
+            opacity: 0.95;
+            font-weight: 500;
+        }
+
+        .block-icon {
+            font-size: 4rem;
+            opacity: 0.25;
+        }
+
+        .priority-block {
+            background: var(--priority-gradient);
+            color: white;
+            border-radius: 20px;
+            padding: 30px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 8px 20px rgba(139, 92, 246, 0.15);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .priority-block-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            margin-bottom: 20px;
+        }
+
+        .progress-container {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.25);
+            height: 14px;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            background: white;
+            height: 100%;
+            border-radius: 10px;
+            width: 72%;
+            box-shadow: 0 0 10px rgba(255,255,255,0.4);
+        }
+
+        /* Recent Activity / Notifications Section */
+        .list-section-card {
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02);
+            border: 1px solid var(--border-color);
+        }
+
+        .section-card-title {
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: var(--text-main);
+            margin-bottom: 20px;
+        }
+
+        .notif-list {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .notif-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 20px;
+            border-radius: 12px;
+            background: #f8fafc;
+            border: 1px solid rgba(226, 232, 240, 0.5);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .notif-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.02);
+            border-color: #cbd5e1;
+        }
+
+        .notif-left {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .notif-icon-circle {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.1rem;
+            flex-shrink: 0;
+        }
+
+        .notif-title {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: var(--text-main);
+            margin-bottom: 2px;
+        }
+
+        .notif-desc {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .notif-time {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        /* Profile Details Tab */
+        .profile-card-container {
+            background: white;
+            border-radius: 20px;
+            padding: 35px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.02);
+            border: 1px solid var(--border-color);
+            display: grid;
+            grid-template-columns: 1fr 280px;
+            gap: 40px;
+        }
+
+        @media (max-width: 900px) {
+            .profile-card-container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .profile-details-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .profile-field-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .profile-field-label {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+            font-weight: 700;
+        }
+
+        .profile-field-value {
+            font-size: 1.05rem;
+            font-weight: 600;
+            color: var(--text-main);
+        }
+
+        .profile-qr-box {
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 25px;
+            text-align: center;
+            background: #f8fafc;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .profile-qr-code {
+            width: 150px;
+            height: 150px;
+            background: white;
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 12px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.02);
+        }
+
+        .profile-qr-code i {
+            font-size: 5rem;
+            color: #1e293b;
+        }
+
+        /* Benefits Tab Content */
+        .benefit-card-list {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .benefit-card {
+            background: white;
+            border-radius: 16px;
+            padding: 25px 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.01);
+            border: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: relative;
+        }
+
+        .benefit-card-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .benefit-gift-icon {
+            width: 56px;
+            height: 56px;
+            background-color: #dcfce7;
+            color: #10b981;
+            border-radius: 12px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.6rem;
+        }
+
+        .benefit-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--text-main);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .benefit-badge {
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 4px 10px;
+            border-radius: 20px;
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .benefit-sub-grid {
+            display: flex;
+            gap: 40px;
+        }
+
+        .benefit-sub-item {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .benefit-sub-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .benefit-sub-val {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #1e293b;
+        }
+
+        /* Need Assistance Card - Styled with details instead of a button */
+        .assistance-alert-card {
+            background: #f5f3ff;
+            border: 1px solid #ddd6fe;
+            border-radius: 16px;
+            padding: 30px;
+            color: #1e293b;
+        }
+
+        .assistance-title {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: #6d28d9;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .assistance-desc {
+            font-size: 0.95rem;
+            color: #5b21b6;
+            margin-bottom: 20px;
+            font-weight: 500;
+        }
+
+        .assistance-contacts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+        }
+
+        .contact-detail-box {
+            background: white;
+            border-radius: 12px;
+            padding: 16px 20px;
+            border: 1px solid #ddd6fe;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            box-shadow: 0 2px 4px rgba(109, 40, 217, 0.02);
+        }
+
+        .contact-detail-icon {
+            width: 40px;
+            height: 40px;
+            background: #f5f3ff;
+            color: #7c3aed;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.1rem;
+        }
+
+        .contact-detail-info {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        .contact-detail-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .contact-detail-val {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: #1e293b;
+        }
+
+        /* Health Tab Content */
+        .health-card {
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.01);
+            border: 1px solid var(--border-color);
+            margin-bottom: 30px;
+        }
+
+        .health-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .health-header-icon {
+            width: 48px;
+            height: 48px;
+            background-color: #fee2e2;
+            color: #ef4444;
+            border-radius: 10px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.3rem;
+        }
+
+        .health-header h3 {
+            font-size: 1.15rem;
+            font-weight: 700;
+        }
+
+        .health-header p {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        .health-logs-list {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .health-log-item {
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px 24px;
+            background: #f8fafc;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .health-log-left {
+            display: flex;
+            gap: 15px;
+            align-items: flex-start;
+        }
+
+        .health-log-icon-square {
+            width: 42px;
+            height: 42px;
+            background: #ffe4e6;
+            color: #f43f5e;
+            border-radius: 8px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1rem;
+            flex-shrink: 0;
+        }
+
+        .health-log-type {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--text-main);
+            margin-bottom: 4px;
+        }
+
+        .health-log-meta {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            font-weight: 500;
+            margin-bottom: 6px;
+        }
+
+        .health-log-details {
+            font-size: 0.9rem;
+            color: #475569;
+            line-height: 1.5;
+        }
+
+        .health-log-date {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+
+        /* Health Footer boxes */
+        .health-footer-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 750px) {
+            .health-footer-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .health-footer-box {
+            border-radius: 16px;
+            padding: 25px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.01);
+            border: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            gap: 15px;
+        }
+
+        .health-box-blue { background: #eff6ff; border-color: #dbeafe; }
+        .health-box-green { background: #f0fdf4; border-color: #dcfce7; }
+
+        .health-box-title {
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+
+        .health-box-text {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .health-box-link {
+            font-size: 0.9rem;
+            font-weight: 600;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            width: fit-content;
+        }
+
+        .link-blue { color: #2563eb; }
+        .link-green { color: #16a34a; }
+
+        /* Interactive Forms Section */
+        .service-form-card {
+            background: white;
+            border-radius: 20px;
+            padding: 35px;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.03);
+            border: 1px solid var(--border-color);
+        }
+
+        .form-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 2px solid #f1f5f9;
+            padding-bottom: 25px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .form-card-title-group h3 {
+            font-size: 1.3rem;
+            font-weight: 800;
+            color: var(--text-main);
+            margin-bottom: 6px;
+        }
+
+        .form-card-title-group p {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .form-download-btn {
+            background: #1e293b;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+
+        .form-download-btn:hover {
+            background: #0f172a;
+            transform: translateY(-1px);
+        }
+
+        .interactive-form {
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+        }
+
+        .form-section-title {
+            font-size: 0.9rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #3b82f6;
+            margin-bottom: 15px;
+            border-bottom: 1px dashed #cbd5e1;
+            padding-bottom: 5px;
+        }
+
+        .form-grid-3 {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+        }
+
+        .form-grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 700px) {
+            .form-grid-3, .form-grid-2 {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .form-group label {
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: #475569;
+        }
+
+        .form-group input, .form-group select, .form-group textarea {
+            padding: 12px 14px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            color: var(--text-main);
+            outline: none;
+            background: #f8fafc;
+            transition: all 0.2s ease;
+        }
+
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+            border-color: #3b82f6;
+            background: white;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        .form-row-checkboxes {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            padding: 5px 0;
+        }
+
+        .checkbox-label-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #334155;
+            cursor: pointer;
+        }
+
+        .checkbox-label-wrapper input {
+            width: 18px;
+            height: 18px;
+            accent-color: #3b82f6;
+        }
+
+        .form-requirements-checklist {
+            background: #f8fafc;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px 25px;
+            margin-top: 10px;
+        }
+
+        .requirement-checklist-title {
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: #475569;
+            margin-bottom: 12px;
+        }
+
+        .requirement-list-ul {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .requirement-list-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: #64748b;
+        }
+
+        .requirement-list-item i {
+            color: #10b981;
+        }
+
+        .form-submit-btn {
+            background: #22c55e;
+            color: white;
+            border: none;
+            padding: 14px 30px;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            align-self: flex-start;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 8px rgba(34, 197, 94, 0.15);
+        }
+
+        .form-submit-btn:hover {
+            background: #16a34a;
+            transform: translateY(-1px);
+        }
+
+        /* Success Toast */
+        .toast-notification {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background: #1e293b;
+            color: white;
+            padding: 15px 25px;
+            border-radius: 10px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            z-index: 9999;
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .toast-notification.active {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .toast-icon {
+            color: #22c55e;
+            font-size: 1.2rem;
+        }
+
+        /* Back to Dashboard Link */
+        .back-link {
+            color: var(--text-muted);
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+            transition: color 0.2s;
+        }
+
+        .back-link:hover {
+            color: #3b82f6;
+        }
+
+        /* KYC Pulse animation for unverified access guard */
+        @keyframes pulse-glow {
+            0%   { transform: scale(1);   box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5); }
+            50%  { transform: scale(1.08); box-shadow: 0 0 15px 5px rgba(239, 68, 68, 0.35); }
+            100% { transform: scale(1);   box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+
+        /* ══════════════════════════════════════════════════════════════════
+           KYC VERIFICATION - GCash/Bybit Style
+           ══════════════════════════════════════════════════════════════════ */
+
+        .kyc-card {
+            max-width: 720px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02);
+            border: 1px solid var(--border-color);
+        }
+
+        /* Step Progress */
+        .kyc-steps {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0;
+            margin-bottom: 35px;
+        }
+
+        .kyc-step {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .kyc-step-circle {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.95rem;
+            background: #e2e8f0;
+            color: #94a3b8;
+            transition: all 0.3s ease;
+        }
+
+        .kyc-step.active .kyc-step-circle {
+            background: #2563eb;
+            color: white;
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+        }
+
+        .kyc-step.done .kyc-step-circle {
+            background: #22c55e;
+            color: white;
+        }
+
+        .kyc-step-label {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .kyc-step.active .kyc-step-label {
+            color: #2563eb;
+        }
+
+        .kyc-step.done .kyc-step-label {
+            color: #22c55e;
+        }
+
+        .kyc-step-connector {
+            width: 80px;
+            height: 3px;
+            background: #e2e8f0;
+            margin: 0 15px;
+            margin-bottom: 28px;
+            border-radius: 2px;
+            transition: background 0.3s ease;
+        }
+
+        .kyc-step-connector.done {
+            background: #22c55e;
+        }
+
+        /* Form Header */
+        .kyc-form-header {
+            margin-bottom: 28px;
+        }
+
+        .kyc-form-header h3 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--text-main);
+            margin-bottom: 6px;
+        }
+
+        .kyc-form-header h3 i {
+            margin-right: 8px;
+            color: #2563eb;
+        }
+
+        .kyc-form-header p {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        /* Form Grid */
+        .kyc-form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 18px;
+            margin-bottom: 10px;
+        }
+
+        .kyc-field {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .kyc-label {
+            font-size: 0.82rem;
+            font-weight: 700;
+            color: #374151;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .kyc-required {
+            color: #ef4444;
+        }
+
+        .kyc-optional {
+            color: #94a3b8;
+            font-weight: 500;
+            text-transform: lowercase;
+            font-size: 0.75rem;
+        }
+
+        .kyc-input {
+            padding: 12px 14px;
+            border: 1.5px solid #d1d5db;
+            border-radius: 10px;
+            font-size: 0.95rem;
+            color: var(--text-main);
+            background: #fafafa;
+            transition: all 0.2s ease;
+            outline: none;
+        }
+
+        .kyc-input:focus {
+            border-color: #2563eb;
+            background: white;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .kyc-input::placeholder {
+            color: #9ca3af;
+            font-weight: 400;
+        }
+
+        /* Next Step Button */
+        .kyc-next-btn {
+            width: 100%;
+            padding: 16px;
+            margin-top: 20px;
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 1.05rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            box-shadow: 0 6px 14px rgba(37, 99, 235, 0.25);
+        }
+
+        .kyc-next-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(37, 99, 235, 0.35);
+        }
+
+        .kyc-next-btn:active {
+            transform: translateY(0);
+        }
+
+        /* Camera Section */
+        .kyc-camera-wrap {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .kyc-camera-frame {
+            position: relative;
+            width: 100%;
+            max-width: 400px;
+            aspect-ratio: 4/3;
+            background: #0f172a;
+            border-radius: 16px;
+            overflow: hidden;
+            border: 3px solid #e2e8f0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .kyc-video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        .kyc-camera-placeholder {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #64748b;
+            gap: 12px;
+            background: #0f172a;
+        }
+
+        .kyc-camera-placeholder i {
+            font-size: 3rem;
+            opacity: 0.5;
+        }
+
+        .kyc-camera-placeholder span {
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .kyc-captured-preview {
+            max-width: 200px;
+            border-radius: 12px;
+            border: 3px solid #22c55e;
+            box-shadow: 0 4px 12px rgba(34, 197, 94, 0.2);
+        }
+
+        /* Face Guide Oval */
+        .kyc-face-guide {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .kyc-face-guide.visible {
+            opacity: 1;
+        }
+
+        .kyc-face-oval {
+            width: 60%;
+            height: 70%;
+            border: 2.5px dashed rgba(255, 255, 255, 0.5);
+            border-radius: 50%;
+            margin-bottom: 15px;
+        }
+
+        .kyc-guide-text {
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        /* Capture Flash */
+        .kyc-capture-flash {
+            position: absolute;
+            inset: 0;
+            background: white;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .kyc-capture-flash.flash {
+            animation: kycFlash 0.3s ease;
+        }
+
+        @keyframes kycFlash {
+            0%   { opacity: 0.7; }
+            100% { opacity: 0; }
+        }
+
+        /* Scan Button */
+        .kyc-scan-btn {
+            width: 100%;
+            padding: 18px;
+            margin-top: 15px;
+            background: linear-gradient(135deg, #22c55e, #16a34a);
+            color: white;
+            border: none;
+            border-radius: 14px;
+            font-size: 1.15rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            box-shadow: 0 6px 14px rgba(34, 197, 94, 0.3);
+            letter-spacing: 0.3px;
+        }
+
+        .kyc-scan-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 22px rgba(34, 197, 94, 0.4);
+        }
+
+        .kyc-scan-btn:active {
+            transform: translateY(0);
+        }
+
+        .kyc-scan-btn:disabled {
+            background: linear-gradient(135deg, #94a3b8, #64748b);
+            cursor: not-allowed;
+            box-shadow: none;
+            transform: none;
+        }
+
+        .kyc-scan-btn i {
+            font-size: 1.3rem;
+        }
+
+        /* Back Button */
+        .kyc-back-btn {
+            display: block;
+            width: 100%;
+            padding: 12px;
+            margin-top: 10px;
+            background: transparent;
+            color: #64748b;
+            border: 1.5px solid #d1d5db;
+            border-radius: 12px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .kyc-back-btn:hover {
+            background: #f8fafc;
+            border-color: #94a3b8;
+            color: var(--text-main);
+        }
+
+        /* ══════════════════════════════════════════════════════════════════
+           MOBILE RESPONSIVE — optimized for smartphones
+           ══════════════════════════════════════════════════════════════════ */
+
+        .mobile-menu-btn { display: none !important; }
+        .mobile-sidebar-overlay { display: none; }
+
+        @media (max-width: 900px) {
+            .portal-header {
+                padding: 0 16px;
+                height: auto;
+                min-height: 64px;
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+
+            .portal-header > div:first-child {
+                width: auto !important;
+                flex: 1;
+            }
+            .portal-header > div:first-child img {
+                height: 32px !important;
+            }
+
+            .mobile-menu-btn { display: flex !important; align-items: center; justify-content: center; order: 2; }
+
+            .portal-header > div:first-child { order: 1; }
+            .portal-header > div:last-child { order: 3; }
+
+            #tabContainer {
+                order: 4;
+                width: 100%;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+                scrollbar-width: none;
+                border-radius: 10px !important;
+                padding: 6px !important;
+                gap: 4px !important;
+            }
+            #tabContainer::-webkit-scrollbar { display: none; }
+            #tabContainer .nav-pill {
+                white-space: nowrap;
+                font-size: 0.82rem;
+                padding: 8px 14px;
+                flex-shrink: 0;
+            }
+
+            .portal-header > div:last-child {
+                width: auto !important;
+                gap: 10px !important;
+            }
+            .portal-header > div:last-child > div:first-child {
+                display: none;
+            }
+
+            .portal-content {
+                padding: 16px;
+            }
+
+            .sidebar {
+                position: fixed;
+                top: 0;
+                left: -280px;
+                height: 100vh;
+                z-index: 1001;
+                transition: left 0.3s ease;
+                width: 260px;
+                box-shadow: 4px 0 20px rgba(0,0,0,0.15);
+            }
+            .sidebar.open { left: 0; }
+
+            .mobile-sidebar-overlay {
+                display: none;
+                position: fixed;
+                inset: 0;
+                background: rgba(0,0,0,0.4);
+                z-index: 1000;
+            }
+            .mobile-sidebar-overlay.visible { display: block; }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+                gap: 12px;
+            }
+
+            .stat-card {
+                padding: 16px 18px;
+                gap: 14px;
+            }
+
+            .dashboard-row-2 {
+                grid-template-columns: 1fr;
+                gap: 14px;
+            }
+
+            .pension-block, .priority-block {
+                padding: 20px;
+                border-radius: 14px;
+            }
+            .pension-block .block-text h2 {
+                font-size: 1.4rem;
+            }
+            .pension-block .block-icon {
+                font-size: 2.5rem !important;
+            }
+
+            .benefit-card-list {
+                gap: 12px;
+            }
+            .benefit-card {
+                padding: 16px;
+            }
+
+            /* ── PROFILE MOBILE ── */
+            .profile-card-container {
+                grid-template-columns: 1fr;
+                gap: 20px;
+                padding: 0;
+                border: none;
+                box-shadow: none;
+                background: transparent;
+            }
+            .profile-details-grid {
+                grid-template-columns: 1fr;
+                gap: 14px;
+            }
+            .profile-field-group[style*="grid-column: span 2"] {
+                grid-column: span 1 !important;
+            }
+            .profile-field-group input,
+            .profile-field-group select {
+                padding: 14px 12px !important;
+                font-size: 1rem !important;
+                min-height: 48px;
+                background: white !important;
+            }
+            .profile-field-group input[readonly] {
+                background: #f1f5f9 !important;
+            }
+            .profile-field-label {
+                font-size: 0.78rem;
+            }
+            .profile-card-container > form {
+                background: white;
+                border-radius: 16px;
+                padding: 20px 16px;
+                border: 1px solid var(--border-color);
+            }
+            .form-submit-btn {
+                width: 100%;
+                text-align: center;
+                align-self: stretch !important;
+                padding: 16px !important;
+                font-size: 1rem !important;
+            }
+            .profile-qr-box {
+                display: none;
+            }
+
+            /* ── KYC MOBILE ── */
+            .kyc-card {
+                padding: 0;
+                border: none;
+                box-shadow: none;
+                background: transparent;
+            }
+            .kyc-card > #verificationFormFlow {
+                background: white;
+                border-radius: 16px;
+                padding: 20px 16px;
+                border: 1px solid var(--border-color);
+            }
+            .kyc-form-grid {
+                grid-template-columns: 1fr;
+                gap: 14px;
+            }
+            .kyc-field[style*="grid-column: 1 / -1"] {
+                grid-column: span 1 !important;
+            }
+            .kyc-step-connector {
+                width: 28px;
+                margin: 0 8px;
+                margin-bottom: 28px;
+            }
+            .kyc-step-circle {
+                width: 36px;
+                height: 36px;
+                font-size: 0.85rem;
+            }
+            .kyc-step-label {
+                font-size: 0.7rem;
+            }
+            .kyc-input {
+                padding: 14px 12px;
+                font-size: 1rem;
+                min-height: 48px;
+            }
+            .kyc-next-btn, .kyc-scan-btn {
+                padding: 16px;
+                font-size: 1rem;
+                border-radius: 12px;
+            }
+            .kyc-camera-frame {
+                max-width: 100%;
+                border-radius: 12px;
+                aspect-ratio: 3/4;
+            }
+            .kyc-face-oval {
+                width: 75%;
+                height: 65%;
+            }
+            .kyc-scan-btn i {
+                font-size: 1.2rem;
+            }
+            .kyc-back-btn {
+                padding: 14px;
+                font-size: 0.95rem;
+            }
+            .kyc-captured-preview {
+                max-width: 180px;
+                margin-top: 10px;
+            }
+            .kyc-form-header h3 {
+                font-size: 1.1rem;
+            }
+            .kyc-form-header p {
+                font-size: 0.85rem;
+            }
+
+            .list-section-card {
+                padding: 18px;
+            }
+
+            .benefit-sub-grid {
+                grid-template-columns: 1fr;
+                gap: 6px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .portal-header > div:last-child #logoutBtn span {
+                display: none;
+            }
+            .portal-header > div:last-child #logoutBtn i {
+                margin-bottom: 0;
+                font-size: 1.1rem;
+            }
+
+            #tabContainer .nav-pill {
+                font-size: 0.75rem;
+                padding: 6px 10px;
+            }
+
+            .stat-icon-wrapper {
+                width: 42px;
+                height: 42px;
+                font-size: 1.1rem;
+            }
+            .stat-value {
+                font-size: 1rem;
+            }
+
+            .pension-block .block-text h2 {
+                font-size: 1.2rem;
+            }
+
+            .kyc-card > #verificationFormFlow {
+                padding: 16px 12px;
+            }
+            .kyc-camera-frame {
+                aspect-ratio: 1/1;
+                max-width: 100%;
+            }
+            .kyc-face-oval {
+                width: 80%;
+                height: 70%;
+            }
+            .kyc-captured-preview {
+                max-width: 140px;
+            }
+
+            .profile-card-container > form {
+                padding: 16px 12px;
+            }
+
+            .section-card-title {
+                font-size: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Unified Top Header & Navigation pills EXACTLY like admin/employee -->
+    <header class="portal-header">
+        <!-- Brand / Logo -->
+        <div style="display: flex; align-items: center; width: 250px;">
+            <img src="/images/logo.png" alt="SilverCare Logo" style="height: 45px; transform: scale(2.8); transform-origin: left center;">
+        </div>
+
+        <!-- Center Navigation Pills (Identical layout to employee/admin) -->
+        <nav style="display: flex; gap: 5px; background: #f8fafc; padding: 8px; border-radius: 50px; border: 1px solid #e2e8f0;" id="tabContainer">
+            <button class="nav-pill active" data-tab="dashboard">Dashboard</button>
+            <button class="nav-pill" data-tab="profile">Profile</button>
+            <button class="nav-pill" data-tab="benefits">Benefits</button>
+
+            <button class="nav-pill" data-tab="verification" id="navPillVerification" style="color: #ef4444; font-weight: 700;"><i class="fas fa-user-shield" style="margin-right: 5px;"></i>Get Verified</button>
+            <button class="nav-pill" data-tab="notifications" style="position: relative;">
+                Notifications
+                <span id="notifBadge" style="display: none; position: absolute; top: -2px; right: -5px; width: 12px; height: 12px; background-color: #ef4444; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 5px rgba(239, 68, 68, 0.5);"></span>
+            </button>
+        </nav>
+
+        <!-- Mobile Menu Toggle -->
+        <button id="mobileMenuToggle" class="mobile-menu-btn" style="display:none; background:none; border:none; color:#1e293b; font-size:1.5rem; cursor:pointer; padding:8px;">
+            <i class="fas fa-bars"></i>
+        </button>
+
+        <!-- Mobile Sidebar Overlay -->
+        <div id="mobileSidebarOverlay" class="mobile-sidebar-overlay"></div>
+
+        <!-- Right Side User Menu (Identical layout to employee/admin) -->
+        <div style="display: flex; align-items: center; gap: 20px; width: 250px; justify-content: flex-end;">
+            <div style="text-align: right; line-height: 1.2;">
+                <div style="font-size: 0.75rem; color: #64748b; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;">Senior Portal</div>
+                <div id="portalGreeting" style="font-size: 0.95rem; color: #1e293b; font-weight: 600; margin-top: 3px;">Loading...</div>
+            </div>
+            <div style="height: 35px; width: 1px; background: #cbd5e1;"></div>
+            <div id="logoutBtn" style="display: flex; flex-direction: column; align-items: center; justify-content: center; color: #ef4444; cursor: pointer; transition: 0.2s;" onmouseover="this.style.opacity='0.7'" onmouseout="this.style.opacity='1'">
+                <i class="fas fa-sign-out-alt" style="font-size: 1.2rem; margin-bottom: 3px;"></i>
+                <span style="font-size: 0.7rem; font-weight: 700;">LOGOUT</span>
+            </div>
+        </div>
+    </header>
+
+    <div class="portal-layout">
+        <!-- Sidebar Menu - Green Background -->
+        <nav class="sidebar">
+            <div class="sidebar-menu-title">Services</div>
+            <ul class="sidebar-links">
+                <li><a class="sidebar-link" data-service="burial"><i class="fas fa-ribbon"></i> Burial Assistance</a></li>
+                <li><a class="sidebar-link" data-service="bedridden"><i class="fas fa-bed"></i> Bedridden</a></li>
+                <li><a class="sidebar-link" data-service="octogenarian"><i class="fas fa-birthday-cake"></i> Octogenarian</a></li>
+                <li><a class="sidebar-link" data-service="centarian"><i class="fas fa-award"></i> Centarian</a></li>
+            </ul>
+        </nav>
+
+        <!-- Main Window -->
+        <div class="main-window">
+            <!-- Content Area -->
+            <div class="portal-content">
+
+                <!-- TAB: DASHBOARD -->
+                <div class="tab-panel active" id="panel-dashboard">
+                    <!-- Stats Grid -->
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-icon-wrapper stat-icon-green">
+                                <i class="fas fa-check-circle"></i>
+                            </div>
+                            <div class="stat-details">
+                                <span class="stat-label">Account Status</span>
+                                <span class="stat-value" id="dashAccountStatus">Active</span>
+                            </div>
+                        </div>
+
+                        <div class="stat-card">
+                            <div class="stat-icon-wrapper stat-orange">
+                                <i class="fas fa-exclamation-triangle"></i>
+                            </div>
+                            <div class="stat-details">
+                                <span class="stat-label">Priority Level</span>
+                                <span class="stat-value" id="dashPriorityLevel">Medium</span>
+                            </div>
+                        </div>
+
+                        <div class="stat-card">
+                            <div class="stat-icon-wrapper stat-purple">
+                                <i class="fas fa-hand-holding-dollar"></i>
+                            </div>
+                            <div class="stat-details">
+                                <span class="stat-label">Active Benefits</span>
+                                <span class="stat-value" id="dashActiveBenefits">2</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Row 2: Pension Release & Priority Score -->
+                    <div class="dashboard-row-2">
+                        <!-- Next Pension Release -->
+                        <div class="pension-block">
+                            <div class="block-text">
+                                <h4>Next Pension Release</h4>
+                                <h2 id="pensionDate">Loading...</h2>
+                                <p id="pensionAmount">Amount: ₱1,500</p>
+                            </div>
+                            <i class="far fa-calendar-alt block-icon"></i>
+                        </div>
+
+                        <!-- My Profile Card -->
+                        <div class="priority-block" style="background: linear-gradient(135deg, #1e40af, #3b82f6);">
+                            <div style="display: flex; justify-content: space-between; align-items: flex-start; width: 100%; margin-bottom: 15px;">
+                                <div>
+                                    <h4 style="font-size: 0.85rem; font-weight: 500; opacity: 0.85; margin-bottom: 4px;">OSCA ID</h4>
+                                    <h2 id="dashSeniorId" style="font-size: 1.5rem; font-weight: 700; letter-spacing: 1px;">Loading...</h2>
+                                </div>
+                                <i class="fas fa-id-card block-icon" style="font-size: 2.8rem; opacity: 0.2;"></i>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+                                <span id="dashKycBadge" style="padding: 4px 14px; border-radius: 20px; font-size: 0.8rem; font-weight: 700; background: rgba(255,255,255,0.2); color: white;">Not Verified</span>
+                                <span style="font-size: 0.8rem; opacity: 0.75;">Member since <span id="dashMemberSince">—</span></span>
+                            </div>
+                            <p id="dashKycMessage" style="font-size: 0.85rem; opacity: 0.9; line-height: 1.4;">Get verified to access all benefits and services.</p>
+                        </div>
+                    </div>
+
+                    <!-- Recent Notifications -->
+                    <div class="list-section-card">
+                        <h3 class="section-card-title">Recent Notifications</h3>
+                        <div class="notif-list" id="dashNotificationsList">
+                            <div class="notif-item">
+                                <div class="notif-left">
+                                    <div class="notif-icon-circle" style="background:#e6f4ea; color:#137333;"><i class="fas fa-dollar-sign"></i></div>
+                                    <div>
+                                        <div class="notif-title">Pension Release</div>
+                                        <div class="notif-desc">Loading pension release info...</div>
+                                    </div>
+                                </div>
+                                <span class="notif-time">Just now</span>
+                            </div>
+                            <div class="notif-item">
+                                <div class="notif-left">
+                                    <div class="notif-icon-circle" style="background:#fce8e6; color:#c5221f;"><i class="fas fa-heartbeat"></i></div>
+                                    <div>
+                                        <div class="notif-title">Health Reminder</div>
+                                        <div class="notif-desc">Schedule your quarterly check-up</div>
+                                    </div>
+                                </div>
+                                <span class="notif-time">1 day ago</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB: PROFILE (UPGRADED EDITABLE AND UPDATABLE FIELDS) -->
+                <div class="tab-panel" id="panel-profile">
+                    <div class="profile-card-container">
+                        <!-- Upgraded interactive profile save form -->
+                        <form id="profileEditForm" style="display: flex; flex-direction: column; gap: 20px; width: 100%;">
+                            <div class="profile-details-grid">
+                                <div class="profile-field-group">
+                                    <label class="profile-field-label" for="editName">Full Name *</label>
+                                    <input type="text" id="editName" style="padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-weight: 600; color: var(--text-main); font-size: 1rem; background: #f8fafc;" required>
+                                </div>
+                                <div class="profile-field-group">
+                                    <label class="profile-field-label">OSCA ID Number (Read-Only)</label>
+                                    <input type="text" id="editOscaId" style="padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-weight: 600; color: #64748b; font-size: 1rem; background: #e2e8f0;" readonly>
+                                </div>
+                                <div class="profile-field-group">
+                                    <label class="profile-field-label" for="editEmail">Email Address *</label>
+                                    <input type="email" id="editEmail" style="padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-weight: 600; color: var(--text-main); font-size: 1rem; background: #f8fafc;" required>
+                                </div>
+                                <div class="profile-field-group">
+                                    <label class="profile-field-label" for="editSex">Sex</label>
+                                    <select id="editSex" style="padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-weight: 600; color: var(--text-main); font-size: 1rem; background: #f8fafc;">
+                                        <option value="Male">Male</option>
+                                        <option value="Female">Female</option>
+                                    </select>
+                                </div>
+                                <div class="profile-field-group">
+                                    <label class="profile-field-label" for="editDob">Date of Birth</label>
+                                    <input type="date" id="editDob" style="padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-weight: 600; color: var(--text-main); font-size: 1rem; background: #f8fafc;">
+                                </div>
+                                <div class="profile-field-group">
+                                    <label class="profile-field-label" for="editCivil">Civil Status</label>
+                                    <select id="editCivil" style="padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-weight: 600; color: var(--text-main); font-size: 1rem; background: #f8fafc;">
+                                        <option value="Single">Single</option>
+                                        <option value="Married">Married</option>
+                                        <option value="Widowed">Widowed</option>
+                                        <option value="Others">Others</option>
+                                    </select>
+                                </div>
+                                <div class="profile-field-group" style="grid-column: span 2;">
+                                    <label class="profile-field-label" for="editAddress">Residential Address</label>
+                                    <input type="text" id="editAddress" style="padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-weight: 600; color: var(--text-main); font-size: 1rem; background: #f8fafc;">
+                                </div>
+                            </div>
+                            <button type="submit" class="form-submit-btn" style="background:#2563eb; align-self:flex-start; margin-top: 10px;">
+                                <i class="fas fa-save"></i> Save Profile Details
+                            </button>
+                        </form>
+
+                        <div class="profile-qr-box">
+                            <div class="profile-qr-code">
+                                <i class="fas fa-qrcode"></i>
+                            </div>
+                            <p style="font-size: 0.85rem; font-weight: 700; color: var(--text-main); margin-bottom: 2px;">Scan for Verification</p>
+                            <p style="font-size: 0.75rem; color: var(--text-muted); font-weight: 500;">OSCA Magalang Office</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB: BENEFITS -->
+                <div class="tab-panel" id="panel-benefits">
+                    <h3 class="section-card-title" style="margin-bottom: 20px;">Your Benefits</h3>
+                    <div class="benefit-card-list" id="benefitsContainer">
+                        <!-- Benefit 1 -->
+                        <div class="benefit-card">
+                            <div class="benefit-card-left">
+                                <div class="benefit-gift-icon">
+                                    <i class="fas fa-gift"></i>
+                                </div>
+                                <div>
+                                    <div class="benefit-title">Monthly Pension <span class="benefit-badge">Approved</span></div>
+                                    <div class="benefit-sub-grid">
+                                        <div class="benefit-sub-item">
+                                            <span class="benefit-sub-label">Benefit amount</span>
+                                            <span class="benefit-sub-val">₱1,500</span>
+                                        </div>
+                                        <div class="benefit-sub-item">
+                                            <span class="benefit-sub-label">Next Release</span>
+                                            <span class="benefit-sub-val">₱1,500</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Benefit 2 -->
+                        <div class="benefit-card">
+                            <div class="benefit-card-left">
+                                <div class="benefit-gift-icon">
+                                    <i class="fas fa-gift"></i>
+                                </div>
+                                <div>
+                                    <div class="benefit-title">Healthcare Assistance <span class="benefit-badge">Approved</span></div>
+                                    <div class="benefit-sub-grid">
+                                        <div class="benefit-sub-item">
+                                            <span class="benefit-sub-label">Benefit amount</span>
+                                            <span class="benefit-sub-val">₱5,000</span>
+                                        </div>
+                                        <div class="benefit-sub-item">
+                                            <span class="benefit-sub-label">Next Release</span>
+                                            <span class="benefit-sub-val">₱5,000</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Contact OSCA details block instead of standard button -->
+                    <div class="assistance-alert-card">
+                        <div class="assistance-title">
+                            <i class="fas fa-info-circle"></i> Need Additional Assistance?
+                        </div>
+                        <div class="assistance-desc">
+                            Please contact OSCA staff directly for more information about available benefits.
+                        </div>
+                        
+                        <div class="assistance-contacts-grid">
+                            <div class="contact-detail-box">
+                                <div class="contact-detail-icon">
+                                    <i class="fas fa-phone-alt"></i>
+                                </div>
+                                <div class="contact-detail-info">
+                                    <span class="contact-detail-label">Mobile Number</span>
+                                    <span class="contact-detail-val">+63 967 890 1234</span>
+                                </div>
+                            </div>
+
+                            <div class="contact-detail-box">
+                                <div class="contact-detail-icon">
+                                    <i class="fas fa-envelope"></i>
+                                </div>
+                                <div class="contact-detail-info">
+                                    <span class="contact-detail-label">Email Address</span>
+                                    <span class="contact-detail-val">osca.magalang.pampanga@gmail.com</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+
+
+                <!-- TAB: NOTIFICATIONS -->
+                <div class="tab-panel" id="panel-notifications">
+                    <div class="list-section-card">
+                        <h3 class="section-card-title">All Notifications</h3>
+                        <div class="notif-list" id="allNotificationsList">
+                            <div class="notif-item">
+                                <div class="notif-left">
+                                    <div class="notif-icon-circle" style="background:#e6f4ea; color:#137333;"><i class="fas fa-dollar-sign"></i></div>
+                                    <div>
+                                        <div class="notif-title">Pension Release</div>
+                                        <div class="notif-desc">Loading pension release info...</div>
+                                    </div>
+                                </div>
+                                <span class="notif-time">Just now</span>
+                            </div>
+                            <div class="notif-item">
+                                <div class="notif-left">
+                                    <div class="notif-icon-circle" style="background:#fce8e6; color:#c5221f;"><i class="fas fa-heartbeat"></i></div>
+                                    <div>
+                                        <div class="notif-title">Health Reminder</div>
+                                        <div class="notif-desc">Schedule your quarterly check-up</div>
+                                    </div>
+                                </div>
+                                <span class="notif-time">1 day ago</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB: VERIFICATION (KYC - GCash/Bybit style) -->
+                <div class="tab-panel" id="panel-verification">
+                    <div class="kyc-card">
+                        <!-- Status Messages -->
+                        <div id="verificationStatusContainer"></div>
+
+                        <!-- Verification Flow -->
+                        <div id="verificationFormFlow">
+                            <!-- Step Progress -->
+                            <div class="kyc-steps">
+                                <div class="kyc-step active" id="kycStep1">
+                                    <div class="kyc-step-circle">1</div>
+                                    <span class="kyc-step-label">Personal Info</span>
+                                </div>
+                                <div class="kyc-step-connector"></div>
+                                <div class="kyc-step" id="kycStep2">
+                                    <div class="kyc-step-circle">2</div>
+                                    <span class="kyc-step-label">Face Scan</span>
+                                </div>
+                            </div>
+
+                            <!-- Step 1: Personal Information -->
+                            <div id="kycStep1Content">
+                                <div class="kyc-form-header">
+                                    <h3><i class="fas fa-id-card"></i> Personal Information</h3>
+                                    <p>Please provide your complete details for verification.</p>
+                                </div>
+
+                                <div class="kyc-form-grid">
+
+                                    <div class="kyc-field">
+                                        <label class="kyc-label">First Name <span class="kyc-required">*</span></label>
+                                        <input type="text" id="kycFirstName" class="kyc-input" placeholder="Enter first name" required>
+                                    </div>
+
+                                    <div class="kyc-field">
+                                        <label class="kyc-label">Middle Name <span class="kyc-optional">(optional)</span></label>
+                                        <input type="text" id="kycMiddleName" class="kyc-input" placeholder="Enter middle name">
+                                    </div>
+
+                                    <div class="kyc-field">
+                                        <label class="kyc-label">Last Name <span class="kyc-required">*</span></label>
+                                        <input type="text" id="kycLastName" class="kyc-input" placeholder="Enter last name" required>
+                                    </div>
+
+                                    <div class="kyc-field">
+                                        <label class="kyc-label">Extension <span class="kyc-optional">(Jr., Sr., III, etc.)</span></label>
+                                        <input type="text" id="kycExtension" class="kyc-input" placeholder="e.g. Jr., Sr., III">
+                                    </div>
+
+                                </div>
+
+                                <div class="kyc-form-grid">
+                                    <div class="kyc-field" style="grid-column: 1 / -1;">
+                                        <label class="kyc-label">Residential Address <span class="kyc-required">*</span></label>
+                                        <input type="text" id="kycAddress" class="kyc-input" placeholder="House/Block/Lot No., Street, Barangay, City" required>
+                                    </div>
+
+                                    <div class="kyc-field">
+                                        <label class="kyc-label">Province <span class="kyc-required">*</span></label>
+                                        <input type="text" id="kycProvince" class="kyc-input" placeholder="e.g. Pampanga" required>
+                                    </div>
+
+                                    <div class="kyc-field">
+                                        <label class="kyc-label">Barangay <span class="kyc-required">*</span></label>
+                                        <input type="text" id="kycBarangay" class="kyc-input" placeholder="e.g. San Nicolas" required>
+                                    </div>
+
+                                    <div class="kyc-field">
+                                        <label class="kyc-label">City / Municipality</label>
+                                        <input type="text" id="kycCity" class="kyc-input" placeholder="e.g. Magalang" value="Magalang">
+                                    </div>
+
+                                    <div class="kyc-field">
+                                        <label class="kyc-label">Citizenship <span class="kyc-required">*</span></label>
+                                        <input type="text" id="kycCitizenship" class="kyc-input" placeholder="e.g. Filipino" value="Filipino" required>
+                                    </div>
+
+                                    <div class="kyc-field">
+                                        <label class="kyc-label">Cellphone Number <span class="kyc-required">*</span></label>
+                                        <input type="tel" id="kycCpNumber" class="kyc-input" placeholder="e.g. 09123456789" pattern="[0-9\+]+" inputmode="numeric" required>
+                                    </div>
+                                </div>
+
+                                <button type="button" id="kycNextBtn" class="kyc-next-btn">
+                                    Next: Scan Your Face <i class="fas fa-arrow-right"></i>
+                                </button>
+                            </div>
+
+                            <!-- Step 2: Face Scan -->
+                            <div id="kycStep2Content" style="display: none;">
+                                <div class="kyc-form-header">
+                                    <h3><i class="fas fa-camera"></i> Face Scan</h3>
+                                    <p>Position your face within the frame and tap "Scan Your Face".</p>
+                                </div>
+
+                                <!-- Camera Container -->
+                                <div class="kyc-camera-wrap">
+                                    <div class="kyc-camera-frame">
+                                        <video id="kycVideo" autoplay playsinline class="kyc-video"></video>
+                                        <div id="kycCameraPlaceholder" class="kyc-camera-placeholder">
+                                            <i class="fas fa-camera"></i>
+                                            <span>Camera is off</span>
+                                        </div>
+                                        <div class="kyc-face-guide" id="kycFaceGuide">
+                                            <div class="kyc-face-oval"></div>
+                                            <span class="kyc-guide-text">Align your face here</span>
+                                        </div>
+                                        <div class="kyc-capture-flash" id="kycCaptureFlash"></div>
+                                        <canvas id="kycCanvas" style="display: none;"></canvas>
+                                    </div>
+                                    <img id="kycCapturedPreview" class="kyc-captured-preview" style="display: none;">
+                                </div>
+
+                                <button type="button" id="kycScanFaceBtn" class="kyc-scan-btn">
+                                    <i class="fas fa-user-check"></i> Scan Your Face
+                                </button>
+
+                                <button type="button" id="kycBackBtn" class="kyc-back-btn">
+                                    <i class="fas fa-arrow-left"></i> Back to Information
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB: SERVICE FORM (Soft filling & downloadable form) -->
+                <div class="tab-panel" id="panel-service-form">
+                    <a class="back-link" id="formBackBtn"><i class="fas fa-arrow-left"></i> Back to Dashboard</a>
+                    
+                    <div class="service-form-card">
+                        <div class="form-card-header">
+                            <div class="form-card-title-group">
+                                <h3 id="formTitle">Burial Assistance Claim Form</h3>
+                                <p id="formSubtitle">Apply for Burial benefits online and download the offline Word document.</p>
+                            </div>
+                            <button class="form-download-btn" id="formDownloadBtn">
+                                <i class="fas fa-file-word"></i> Download .docx Form
+                            </button>
+                        </div>
+
+                        <!-- Main form area containing fields dynamically populated based on selected service -->
+                        <form id="interactiveServiceForm" class="interactive-form">
+                            <!-- Wrapper for dynamic fields -->
+                            <div id="dynamicFormFields"></div>
+
+                            <button type="submit" class="form-submit-btn">Submit Assistance Claim</button>
+                        </form>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Appointment Modal -->
+    <div id="appointmentModal" style="display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.6); backdrop-filter: blur(4px); z-index: 9999; justify-content: center; align-items: center; padding: 20px;">
+        <div style="background: white; border-radius: 16px; width: 100%; max-width: 450px; padding: 30px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; display: flex; flex-direction: column; gap: 20px; animation: fadeIn 0.2s ease-out;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eff6ff; padding-bottom: 15px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div style="width: 40px; height: 40px; background: #eff6ff; border-radius: 50%; display: flex; justify-content: center; align-items: center; color: #3b82f6; font-size: 1.1rem;">
+                        <i class="far fa-calendar-check"></i>
+                    </div>
+                    <h3 style="color: #1e293b; font-size: 1.2rem; font-weight: 700; margin: 0;">Schedule Check-up</h3>
+                </div>
+                <span id="closeAppointmentModal" style="font-size: 1.8rem; color: #94a3b8; cursor: pointer; font-weight: bold; line-height: 1;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#94a3b8'">&times;</span>
+            </div>
+            
+            <form id="appointmentForm" style="display: flex; flex-direction: column; gap: 15px;">
+                <div class="form-group">
+                    <label for="apptDoctor" style="font-size: 0.85rem; font-weight: 700; color: #475569; margin-bottom: 5px;">Select Doctor</label>
+                    <select id="apptDoctor" required style="width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.95rem; background: #f8fafc; outline: none;">
+                        <option value="Dr. Maria Santos">Dr. Maria Santos (Cardiology)</option>
+                        <option value="Dr. Juan Reyes">Dr. Juan Reyes (General Practice)</option>
+                        <option value="Dr. Elena Cruz">Dr. Elena Cruz (Geriatrics)</option>
+                    </select>
+                </div>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                    <div class="form-group">
+                        <label for="apptDate" style="font-size: 0.85rem; font-weight: 700; color: #475569; margin-bottom: 5px;">Preferred Date</label>
+                        <input type="date" id="apptDate" required style="width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.95rem; background: #f8fafc; outline: none;">
+                    </div>
+                    <div class="form-group">
+                        <label for="apptTime" style="font-size: 0.85rem; font-weight: 700; color: #475569; margin-bottom: 5px;">Preferred Time</label>
+                        <select id="apptTime" required style="width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.95rem; background: #f8fafc; outline: none;">
+                            <option value="09:00 AM">09:00 AM</option>
+                            <option value="10:00 AM">10:00 AM</option>
+                            <option value="11:00 AM">11:00 AM</option>
+                            <option value="02:00 PM">02:00 PM</option>
+                            <option value="03:00 PM">03:00 PM</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="apptReason" style="font-size: 0.85rem; font-weight: 700; color: #475569; margin-bottom: 5px;">Reason for Visit</label>
+                    <textarea id="apptReason" rows="3" placeholder="Briefly describe your symptoms or reason for check-up..." required style="width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.95rem; background: #f8fafc; outline: none; resize: none;"></textarea>
+                </div>
+                
+                <button type="submit" style="background: #3b82f6; color: white; border: none; padding: 14px; border-radius: 8px; font-weight: 700; font-size: 1rem; cursor: pointer; margin-top: 5px; box-shadow: 0 4px 10px rgba(59, 130, 246, 0.2); transition: background 0.2s;" onmouseover="this.style.background='#2563eb'" onmouseout="this.style.background='#3b82f6'">Confirm Appointment</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Medications Modal -->
+    <div id="medicationsModal" style="display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.6); backdrop-filter: blur(4px); z-index: 9999; justify-content: center; align-items: center; padding: 20px;">
+        <div style="background: white; border-radius: 16px; width: 100%; max-width: 500px; padding: 30px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; display: flex; flex-direction: column; gap: 20px; animation: fadeIn 0.2s ease-out;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #f0fdf4; padding-bottom: 15px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div style="width: 40px; height: 40px; background: #f0fdf4; border-radius: 50%; display: flex; justify-content: center; align-items: center; color: #16a34a; font-size: 1.1rem;">
+                        <i class="fas fa-pills"></i>
+                    </div>
+                    <h3 style="color: #1e293b; font-size: 1.2rem; font-weight: 700; margin: 0;">Prescription History</h3>
+                </div>
+                <span id="closeMedicationsModal" style="font-size: 1.8rem; color: #94a3b8; cursor: pointer; font-weight: bold; line-height: 1;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#94a3b8'">&times;</span>
+            </div>
+            
+            <div style="display: flex; flex-direction: column; gap: 15px; max-height: 400px; overflow-y: auto;">
+                <div style="border: 1px solid #e2e8f0; border-radius: 12px; padding: 15px; background: #f8fafc; border-left: 4px solid #22c55e;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+                        <h4 style="color: #1e293b; font-size: 1.05rem; font-weight: 700; margin: 0;">Amlodipine (5mg)</h4>
+                        <span style="background: #dcfce7; color: #15803d; padding: 3px 8px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;">Active</span>
+                    </div>
+                    <p style="color: #475569; font-size: 0.9rem; margin: 0 0 10px 0;">Take 1 tablet daily (Morning)</p>
+                    <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: #64748b;">
+                        <span>Prescribed by: Dr. Juan Reyes</span>
+                        <span>Refills left: 2</span>
+                    </div>
+                </div>
+                
+                <div style="border: 1px solid #e2e8f0; border-radius: 12px; padding: 15px; background: #f8fafc; border-left: 4px solid #22c55e;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+                        <h4 style="color: #1e293b; font-size: 1.05rem; font-weight: 700; margin: 0;">Metformin (500mg)</h4>
+                        <span style="background: #dcfce7; color: #15803d; padding: 3px 8px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;">Active</span>
+                    </div>
+                    <p style="color: #475569; font-size: 0.9rem; margin: 0 0 10px 0;">Take 1 tablet twice daily with meals</p>
+                    <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: #64748b;">
+                        <span>Prescribed by: Dr. Maria Santos</span>
+                        <span>Refills left: 1</span>
+                    </div>
+                </div>
+                
+                <div style="border: 1px solid #e2e8f0; border-radius: 12px; padding: 15px; background: #f8fafc; border-left: 4px solid #94a3b8; opacity: 0.8;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+                        <h4 style="color: #64748b; font-size: 1.05rem; font-weight: 700; margin: 0;">Amoxicillin (500mg)</h4>
+                        <span style="background: #f1f5f9; color: #64748b; padding: 3px 8px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;">Completed</span>
+                    </div>
+                    <p style="color: #64748b; font-size: 0.9rem; margin: 0 0 10px 0;">Take 1 capsule every 8 hours for 7 days</p>
+                    <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: #94a3b8;">
+                        <span>Prescribed by: Dr. Elena Cruz</span>
+                        <span>Finished: Jan 15, 2026</span>
+                    </div>
+                </div>
+            </div>
+            
+            <button style="background: #10b981; color: white; border: none; padding: 12px; border-radius: 8px; font-weight: 700; font-size: 0.95rem; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 8px; box-shadow: 0 4px 10px rgba(16, 185, 129, 0.2); transition: background 0.2s;" onmouseover="this.style.background='#059669'" onmouseout="this.style.background='#10b981'" onclick="scNotify('success', 'Refill request sent to OSCA pharmacy!'); document.getElementById('closeMedicationsModal').click();">
+                <i class="fas fa-prescription-bottle-alt"></i> Request Prescription Refill
+            </button>
+        </div>
+    </div>
+
+    <!-- Success Toast Notification -->
+    <div class="toast-notification" id="successToast">
+        <i class="fas fa-circle-check toast-icon"></i>
+        <span id="toastMessage">Claim submitted successfully!</span>
+    </div>
+
+    <!-- Include Javascript files -->
+    <script type="module" src="/js/senior.js"></script>
+</body>
+</html>

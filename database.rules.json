@@ -1,0 +1,28 @@
+{
+  "rules": {
+    "users": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "transactions": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "system": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "claims": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "pensions": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "notifications": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    }
+  }
+}

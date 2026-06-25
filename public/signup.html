@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SilverCare - Sign Up / Request Access</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/style.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+
+<body
+    style="background-color: #f8fafc; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh;">
+
+    <!-- Toast Notification Container -->
+    <div id="toastContainer"
+        style="position: fixed; top: 20px; right: 20px; z-index: 2000; display: flex; flex-direction: column; gap: 10px;">
+    </div>
+
+    <div class="login-wrapper">
+        <div class="logo-container" style="text-align: center; margin-bottom: 20px;">
+            <img src="/images/logo.png" alt="SilverCare Logo" style="max-width: 200px;">
+        </div>
+
+        <div class="glass-container login-card" style="background: white; max-width: 500px;">
+            <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                <button id="tabStaff" class="btn btn-block" style="background: #3b82f6;"
+                    onclick="switchSignupTab('employee')">Employee</button>
+                <button id="tabSenior" class="btn btn-block" style="background: #e2e8f0; color: #475569;"
+                    onclick="switchSignupTab('senior')">Senior Citizen</button>
+            </div>
+
+            <h3 id="signupTitle" style="text-align: center; margin-bottom: 20px;">Employee Registration</h3>
+
+            <form id="signupForm" class="login-form">
+                <input type="hidden" id="signupRole" value="employee">
+
+                <div id="seniorFields" style="display: none;">
+                    <div class="input-group">
+                        <i class="fas fa-id-card"></i>
+                        <input type="text" id="seniorId" placeholder="Senior Citizen ID Number">
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <i class="fas fa-user"></i>
+                    <input type="text" id="fullname" placeholder="Full Name / Username" required>
+                </div>
+
+                <div class="input-group">
+                    <i class="fas fa-envelope"></i>
+                    <input type="email" id="email" placeholder="Email Address" required>
+                </div>
+
+                <div class="input-group">
+                    <i class="fas fa-lock"></i>
+                    <input type="password" id="password" placeholder="Create Password" required>
+                </div>
+
+                <div class="input-group">
+                    <i class="fas fa-lock"></i>
+                    <input type="password" id="confirmPassword" placeholder="Confirm Password" required>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-block" style="background: #22c55e;">Submit
+                    Request</button>
+            </form>
+
+            <div style="text-align: center; margin-top: 15px; font-size: 0.9rem;">
+                <a href="/" style="color: #64748b; text-decoration: none;"><i class="fas fa-arrow-left"></i> Back to
+                    Login</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- OTP Modal -->
+    <div id="otpModal"
+        style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;">
+        <div
+            style="background: white; padding: 35px; border-radius: 16px; width: 420px; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.15); animation: popIn 0.3s ease-out;">
+            <div
+                style="width: 70px; height: 70px; background: linear-gradient(135deg, #dbeafe, #bfdbfe); border-radius: 50%; display: flex; justify-content: center; align-items: center; margin: 0 auto 20px;">
+                <i class="fas fa-envelope-open-text" style="font-size: 2rem; color: #3b82f6;"></i>
+            </div>
+            <h3 style="margin-bottom: 8px; color: #1e293b; font-size: 1.3rem;">Email Verification</h3>
+            <p id="otpEmailDisplay" style="color: #3b82f6; font-size: 0.85rem; margin-bottom: 5px; font-weight: 600;">
+            </p>
+            <p style="color: #64748b; font-size: 0.9rem; margin-bottom: 25px;">We've sent a 6-digit PIN to your email.
+                Enter it below to verify your account.</p>
+
+            <div style="display: flex; gap: 8px; justify-content: center; margin-bottom: 25px;">
+                <input type="text" class="otp-input" maxlength="1" inputmode="numeric">
+                <input type="text" class="otp-input" maxlength="1" inputmode="numeric">
+                <input type="text" class="otp-input" maxlength="1" inputmode="numeric">
+                <input type="text" class="otp-input" maxlength="1" inputmode="numeric">
+                <input type="text" class="otp-input" maxlength="1" inputmode="numeric">
+                <input type="text" class="otp-input" maxlength="1" inputmode="numeric">
+            </div>
+
+            <button id="verifyOtpBtn" class="btn btn-block"
+                style="background: #3b82f6; color: white; padding: 12px; font-weight: 600;">Verify PIN</button>
+            <p style="color: #94a3b8; font-size: 0.8rem; margin-top: 15px;">Didn't receive a code? Check your spam
+                folder.</p>
+        </div>
+    </div>
+
+    <!-- Success Notification Modal -->
+    <div id="successModal"
+        style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;">
+        <div
+            style="background: white; padding: 40px 30px; border-radius: 16px; width: 420px; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.15); animation: popIn 0.3s ease-out;">
+            <div
+                style="width: 80px; height: 80px; background: linear-gradient(135deg, #dcfce7, #bbf7d0); border-radius: 50%; display: flex; justify-content: center; align-items: center; margin: 0 auto 20px;">
+                <i class="fas fa-check" style="font-size: 2.5rem; color: #22c55e;"></i>
+            </div>
+            <h3 style="margin-bottom: 10px; color: #1e293b; font-size: 1.4rem;">Account Requested Successfully!</h3>
+            <p style="color: #64748b; font-size: 1rem; margin-bottom: 25px; line-height: 1.6;">Your account has been
+                submitted for review. Please wait for the <strong>Admin's approval</strong> before you can log in.</p>
+            <button onclick="window.location.href='/'" class="btn btn-block"
+                style="background: #22c55e; color: white; padding: 12px; font-weight: 600;">Back to Login</button>
+        </div>
+    </div>
+
+    <!-- Error Notification Modal -->
+    <div id="errorModal"
+        style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;">
+        <div
+            style="background: white; padding: 35px 30px; border-radius: 16px; width: 420px; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.15); animation: popIn 0.3s ease-out;">
+            <div
+                style="width: 70px; height: 70px; background: linear-gradient(135deg, #fee2e2, #fecaca); border-radius: 50%; display: flex; justify-content: center; align-items: center; margin: 0 auto 20px;">
+                <i class="fas fa-exclamation-triangle" style="font-size: 2rem; color: #ef4444;"></i>
+            </div>
+            <h3 style="margin-bottom: 10px; color: #1e293b; font-size: 1.2rem;">Registration Failed</h3>
+            <p id="errorMessage" style="color: #64748b; font-size: 0.95rem; margin-bottom: 25px; line-height: 1.5;"></p>
+            <button id="closeErrorModal" class="btn btn-block"
+                style="background: #ef4444; color: white; padding: 12px;">Try Again</button>
+        </div>
+    </div>
+
+    <!-- Warning Toast Modal (for password mismatch etc.) -->
+    <div id="warningModal"
+        style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;">
+        <div
+            style="background: white; padding: 35px 30px; border-radius: 16px; width: 420px; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.15); animation: popIn 0.3s ease-out;">
+            <div
+                style="width: 70px; height: 70px; background: linear-gradient(135deg, #fef3c7, #fde68a); border-radius: 50%; display: flex; justify-content: center; align-items: center; margin: 0 auto 20px;">
+                <i class="fas fa-exclamation" style="font-size: 2rem; color: #f59e0b;"></i>
+            </div>
+            <h3 style="margin-bottom: 10px; color: #1e293b; font-size: 1.2rem;">Attention</h3>
+            <p id="warningMessage" style="color: #64748b; font-size: 0.95rem; margin-bottom: 25px; line-height: 1.5;">
+            </p>
+            <button id="closeWarningModal" class="btn btn-block"
+                style="background: #f59e0b; color: white; padding: 12px;">Got It</button>
+        </div>
+    </div>
+
+    <style>
+        @keyframes popIn {
+            0% {
+                transform: scale(0.8);
+                opacity: 0;
+            }
+
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        .otp-input {
+            width: 48px;
+            height: 56px;
+            text-align: center;
+            font-size: 1.5rem;
+            font-weight: 700;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            background: #f8fafc;
+            transition: all 0.2s ease;
+            color: #1e293b;
+        }
+
+        .otp-input:focus {
+            outline: none;
+            border-color: #3b82f6;
+            background: white;
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+        }
+    </style>
+
+    <script type="module" src="/js/signup.js"></script>
+    <script>
+        function switchSignupTab(role) {
+            document.getElementById('signupRole').value = role;
+            const tabStaff = document.getElementById('tabStaff');
+            const tabSenior = document.getElementById('tabSenior');
+            const seniorFields = document.getElementById('seniorFields');
+            const title = document.getElementById('signupTitle');
+
+            if (role === 'employee') {
+                tabStaff.style.background = '#3b82f6'; tabStaff.style.color = 'white';
+                tabSenior.style.background = '#e2e8f0'; tabSenior.style.color = '#475569';
+                seniorFields.style.display = 'none';
+                title.innerText = 'Employee Registration';
+                document.getElementById('seniorId').required = false;
+            } else {
+                tabSenior.style.background = '#22c55e'; tabSenior.style.color = 'white';
+                tabStaff.style.background = '#e2e8f0'; tabStaff.style.color = '#475569';
+                seniorFields.style.display = 'block';
+                title.innerText = 'Senior Citizen Registration';
+                document.getElementById('seniorId').required = true;
+            }
+        }
+    </script>
+</body>
+
+</html>

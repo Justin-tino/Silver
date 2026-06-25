@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SilverCare - Login</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/style.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body style="background-color: #f8fafc; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh;">
+
+    <div class="login-wrapper">
+        <div class="logo-container" style="text-align: center; margin-bottom: 30px;">
+            <img src="/images/logo.png" alt="SilverCare Logo" style="max-width: 250px;">
+        </div>
+
+        <div class="divider-text">
+            <span>Log In</span>
+        </div>
+
+        <!-- Role Selection Screen -->
+        <div id="roleSelection" style="text-align: center;">
+            <div class="role-grid">
+                <div class="role-card admin-card" onclick="showLogin('admin')">
+                    <i class="fas fa-shield-alt"></i>
+                    <h3>Admin</h3>
+                    <p>System Management</p>
+                </div>
+                
+                <div class="role-card staff-card" onclick="showLogin('employee')">
+                    <i class="fas fa-users-cog"></i>
+                    <h3>OSCA Staff</h3>
+                    <p>Benefits processing</p>
+                </div>
+                
+                <div class="role-card senior-card" onclick="showLogin('senior')">
+                    <i class="fas fa-user"></i>
+                    <h3>Senior Citizen</h3>
+                    <p>View benefits</p>
+                </div>
+            </div>
+            
+            <div style="margin-top: 40px;">
+                <p style="color: #64748b; margin-bottom: 15px;">New to SilverCare?</p>
+                <a href="/signup" class="btn" style="background: #22c55e; color: white; text-decoration: none; padding: 12px 30px; font-weight: 600; display: inline-block;">Create an Account</a>
+            </div>
+        </div>
+
+        <!-- Login Form Screen (Hidden initially) -->
+        <div id="loginFormContainer" class="glass-container login-card" style="display: none; background: white; margin-top: 20px;">
+            <button onclick="showRoles()" style="background:none; border:none; color:#718096; cursor:pointer; margin-bottom:20px;">
+                <i class="fas fa-arrow-left"></i> Back to role selection
+            </button>
+            
+            <div id="loginHeader" style="text-align: center; margin-bottom: 20px;">
+                <!-- Icon and Title injected by JS -->
+            </div>
+
+            <form id="loginForm" class="login-form">
+                <div class="input-group">
+                    <i class="fas fa-envelope"></i>
+                    <input type="email" id="email" placeholder="Email Address" required>
+                </div>
+                
+                <div class="input-group">
+                    <i class="fas fa-lock"></i>
+                    <input type="password" id="password" placeholder="Password" required>
+                </div>
+                
+                <button type="submit" class="btn btn-primary btn-block" style="background: #3b82f6;">Verify & Login</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="/js/notify.js"></script>
+    <script type="module" src="/js/main.js"></script>
+    <script>
+        function showLogin(role) {
+            document.getElementById('roleSelection').style.display = 'none';
+            document.getElementById('loginFormContainer').style.display = 'block';
+            
+            const header = document.getElementById('loginHeader');
+            const emailInput = document.getElementById('email');
+            const passInput = document.getElementById('password');
+            
+            // Clear inputs
+            emailInput.value = '';
+            passInput.value = '';
+            
+            if (role === 'admin') {
+                header.innerHTML = '<i class="fas fa-shield-alt" style="font-size:3rem; color:#3b82f6; margin-bottom:10px;"></i><h3>Admin Login</h3>';
+            } else if (role === 'employee') {
+                header.innerHTML = '<i class="fas fa-users-cog" style="font-size:3rem; color:#4a5568; margin-bottom:10px;"></i><h3>Staff Login</h3>';
+            } else {
+                header.innerHTML = '<i class="fas fa-user" style="font-size:3rem; color:#22c55e; margin-bottom:10px;"></i><h3>Senior Login</h3>';
+            }
+        }
+
+        function showRoles() {
+            document.getElementById('roleSelection').style.display = 'block';
+            document.getElementById('loginFormContainer').style.display = 'none';
+        }
+    </script>
+</body>
+</html>
