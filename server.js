@@ -6,7 +6,16 @@ const nodemailer = require('nodemailer');
 const admin = require('firebase-admin');
 
 // Initialize Firebase Admin
-const serviceAccount = require('./serviceAccountKey.json');
+const fs = require('fs');
+let serviceAccount;
+if (fs.existsSync('./serviceAccountKey.json')) {
+    serviceAccount = require('./serviceAccountKey.json');
+} else if (process.env.SERVICE_ACCOUNT_JSON) {
+    serviceAccount = JSON.parse(process.env.SERVICE_ACCOUNT_JSON);
+} else {
+    console.error('No service account credentials found. Set SERVICE_ACCOUNT_JSON env var or place serviceAccountKey.json.');
+    process.exit(1);
+}
 admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
     databaseURL: process.env.FIREBASE_DATABASE_URL || `https://${process.env.FIREBASE_PROJECT_ID}-default-rtdb.firebaseio.com`

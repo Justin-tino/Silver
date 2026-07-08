@@ -1,10 +1,10 @@
 export const firebaseConfig = {
-    apiKey: "AIzaSyBSlY_Lvoo14_eqdhuhl9wYT8sMPT5F2WA",
-    authDomain: "silvercare-c79f9.firebaseapp.com",
-    projectId: "silvercare-c79f9",
-    storageBucket: "silvercare-c79f9.firebasestorage.app",
-    messagingSenderId: "178874598558",
-    appId: "1:178874598558:web:42a500d63523e1d09e278f",
-    measurementId: "G-0K1SPG6FRM",
-    databaseURL: "https://silvercare-c79f9-default-rtdb.firebaseio.com"
+    apiKey: "AIzaSyC8tpmli3OcJnU3mrdv4vE12ZwjflW6pwc",
+    authDomain: "silvercare-a89e6.firebaseapp.com",
+    projectId: "silvercare-a89e6",
+    storageBucket: "silvercare-a89e6.firebasestorage.app",
+    messagingSenderId: "877349669858",
+    appId: "1:877349669858:web:a40503f990ff234b3987bb",
+    measurementId: "G-ESS5LVB5SX",
+    databaseURL: "https://silvercare-a89e6-default-rtdb.asia-southeast1.firebasedatabase.app"
 };
