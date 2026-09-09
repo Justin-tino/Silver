@@ -6,6 +6,7 @@ const nodemailer = require('nodemailer');
 const admin = require('firebase-admin');
 const idVault = require('./lib/supabaseStorage');
 const priorityEngine = require('./public/js/priority-engine');
+const queueBackend = require('./_queue_backend');
 
 // Initialize Firebase Admin
 const fs = require('fs');
