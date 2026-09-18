@@ -427,3 +427,51 @@ input[type=range] {
     cursor: pointer;
     margin-top: 10px;
 }
+
+/* --- TWO-FACTOR AUTHENTICATION (2FA) SCREEN --- */
+.otp-group {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 12px;
+    border: 2px solid #e2e8f0;
+    border-radius: 28px;
+    padding: 12px 18px;
+    cursor: text;
+    transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+.otp-group:focus-within {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.otp-input {
+    flex: 0 0 auto;
+    width: 34px;
+    height: 44px;
+    border: none;
+    outline: none;
+    background: transparent;
+    text-align: center;
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #1e293b;
+    padding: 0;
+    margin: 0;
+    caret-color: transparent;
+    border-radius: 8px;
+    transition: background 0.2s;
+}
+
+.otp-input:focus {
+    background: rgba(59, 130, 246, 0.1);
+}
+
+.otp-input::-webkit-outer-spin-button,
+.otp-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+

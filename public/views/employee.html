@@ -7,6 +7,7 @@
     <title>Employee Dashboard | SilverCare</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="/css/process-benefits-board.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         .employee-greeting {
@@ -199,68 +200,314 @@
             cursor: pointer;
         }
 
-        /* Payout List */
-        .payout-container {
-            background: #dcfce7;
-            padding: 20px;
-            border-radius: 12px;
-            height: 100%;
-        }
-
-        .payout-row {
+        /* ── Notifications feed & reminder composer ── */
+        .emp-notif-head {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 15px 0;
-            border-bottom: 1px solid rgba(0,0,0,0.05);
+            gap: 16px;
+            flex-wrap: wrap;
+            border-bottom: 2px solid #1e293b;
+            padding-bottom: 16px;
+            margin-bottom: 18px;
+        }
+        .emp-notif-head .enh-left { display: flex; align-items: center; gap: 14px; }
+        .emp-notif-head .enh-icon {
+            width: 46px; height: 46px; border-radius: 12px;
+            background: #eff6ff; color: #2563eb;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.15rem; flex-shrink: 0;
+        }
+        .emp-notif-head h3 { margin: 0; color: #1e293b; font-size: 1.3rem; font-weight: 700; }
+        .emp-notif-head p { margin: 2px 0 0; color: #64748b; font-size: 0.85rem; }
+        .emp-notif-head .enh-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .notif-unread-pill {
+            background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca;
+            padding: 4px 12px; border-radius: 999px; font-size: 0.78rem; font-weight: 700;
+        }
+        .notif-markall-btn {
+            display: inline-flex; align-items: center; gap: 7px;
+            background: #1e293b; color: #fff; border: none;
+            padding: 8px 16px; border-radius: 8px;
+            font-size: 0.8rem; font-weight: 600; cursor: pointer;
+            transition: all 0.2s ease; font-family: inherit;
+        }
+        .notif-markall-btn:hover { background: #334155; }
+
+        .notif-filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+        .notif-chip {
+            background: #f8fafc; color: #475569; border: 1px solid #e2e8f0;
+            padding: 7px 16px; border-radius: 999px;
+            font-size: 0.82rem; font-weight: 600; cursor: pointer;
+            display: inline-flex; align-items: center; gap: 6px;
+            transition: all 0.2s ease; font-family: inherit;
+        }
+        .notif-chip:hover { border-color: #94a3b8; }
+        .notif-chip.active { background: #1e293b; color: #fff; border-color: #1e293b; }
+
+        .notif-feed { display: flex; flex-direction: column; gap: 10px; margin-bottom: 28px; }
+        .notif-item {
+            display: flex; align-items: flex-start; gap: 14px;
+            padding: 16px 18px;
+            background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px;
+            cursor: pointer; transition: all 0.2s ease;
+        }
+        .notif-item:hover {
+            background: #fff; border-color: #94a3b8;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.06); transform: translateX(2px);
+        }
+        .notif-item.unread { background: #eff6ff; border-color: #bfdbfe; }
+        .notif-item.unread:hover { background: #fff; }
+        .notif-item .ni-icon {
+            width: 40px; height: 40px; border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.95rem; flex-shrink: 0;
+        }
+        .notif-item .ni-title {
+            margin: 0; font-size: 0.92rem; font-weight: 700; color: #1e293b;
+            display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+        }
+        .notif-item .ni-desc { margin: 2px 0 0; font-size: 0.84rem; color: #64748b; line-height: 1.45; }
+        .notif-item .ni-time {
+            margin-left: auto; font-size: 0.75rem; color: #94a3b8;
+            font-weight: 600; white-space: nowrap; flex-shrink: 0;
+        }
+        .notif-item .ni-unread-dot { width: 9px; height: 9px; border-radius: 50%; background: #3b82f6; flex-shrink: 0; margin-top: 6px; }
+        .notif-item .ni-dot-hidden { width: 9px; flex-shrink: 0; }
+        .notif-empty { text-align: center; color: #94a3b8; padding: 44px 20px; font-size: 0.9rem; }
+        .notif-empty i { font-size: 2.2rem; margin-bottom: 10px; display: block; opacity: 0.5; }
+        .notif-new-tag {
+            background: #3b82f6; color: #fff; font-size: 0.62rem; font-weight: 800;
+            padding: 2px 8px; border-radius: 999px; letter-spacing: 0.5px;
         }
 
-        .payout-row:last-child {
-            border-bottom: none;
-        }
+        .ni-type-verify { background: #eff6ff; color: #2563eb; }
+        .ni-type-kyc    { background: #f5f3ff; color: #7c3aed; }
+        .ni-type-appt   { background: #ecfeff; color: #0891b2; }
+        .ni-type-claim  { background: #fffbeb; color: #d97706; }
 
-        .payout-row h4 { margin: 0; font-size: 0.95rem; color: #166534; }
-        .payout-row p { margin: 0; font-size: 0.8rem; color: #166534; font-weight: 500;}
+        /* Reminder composer (Send Reminders, redesigned) */
+        .reminder-composer {
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            border: 1px solid #e2e8f0; border-radius: 16px; padding: 24px;
+        }
+        .reminder-composer .rc-head { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+        .reminder-composer .rc-icon {
+            width: 42px; height: 42px; border-radius: 12px;
+            background: #ede9fe; color: #7c3aed;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1rem; flex-shrink: 0;
+        }
+        .reminder-composer h4 { margin: 0; color: #1e293b; font-size: 1.05rem; font-weight: 700; }
+        .reminder-composer p { margin: 2px 0 0; color: #64748b; font-size: 0.8rem; }
+        .reminder-composer textarea {
+            width: 100%; height: 120px; box-sizing: border-box;
+            border: 1.5px solid #cbd5e1; border-radius: 12px;
+            padding: 14px 16px; resize: vertical;
+            font-family: 'Inter', sans-serif; font-size: 0.92rem; color: #1e293b;
+            background: white; outline: none; transition: all 0.2s ease;
+        }
+        .reminder-composer textarea:focus {
+            border-color: #8b5cf6;
+            box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.15);
+        }
+        .reminder-composer .rc-quick {
+            display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+            margin: 12px 0 4px; font-size: 0.78rem; color: #94a3b8; font-weight: 600;
+        }
+        .reminder-composer .rc-quick button {
+            background: #fff; color: #475569; border: 1px solid #e2e8f0;
+            padding: 5px 12px; border-radius: 999px;
+            font-size: 0.75rem; font-weight: 600; cursor: pointer;
+            transition: all 0.2s ease; font-family: inherit;
+        }
+        .reminder-composer .rc-quick button:hover { border-color: #8b5cf6; color: #7c3aed; }
+        .reminder-composer .rc-foot {
+            display: flex; justify-content: space-between; align-items: center;
+            gap: 12px; flex-wrap: wrap; margin-top: 12px;
+        }
+        .reminder-composer .rc-count { font-size: 0.75rem; color: #94a3b8; font-weight: 600; }
+        .reminder-composer .rc-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+        .btn-rc-primary {
+            display: inline-flex; align-items: center; gap: 8px;
+            background: #1e293b; color: #fff; border: none;
+            padding: 11px 22px; border-radius: 10px;
+            font-weight: 600; font-size: 0.88rem; cursor: pointer;
+            transition: all 0.2s ease; font-family: inherit;
+        }
+        .btn-rc-primary:hover {
+            background: #334155; transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(30, 41, 59, 0.25);
+        }
+        .btn-rc-secondary {
+            display: inline-flex; align-items: center; gap: 8px;
+            background: #fff; color: #1e293b; border: 1px solid #a1a1aa;
+            padding: 11px 22px; border-radius: 10px;
+            font-weight: 600; font-size: 0.88rem; cursor: pointer;
+            transition: all 0.2s ease; font-family: inherit;
+        }
+        .btn-rc-secondary:hover { border-color: #1e293b; }
 
-        .btn-tiny-green {
-            background: #86efac;
-            color: #166534;
-            border: none;
-            padding: 5px 15px;
-            border-radius: 20px;
-            font-size: 0.75rem;
-            font-weight: 600;
-            cursor: pointer;
+        /* ── Employee Dashboard Overview ── */
+        .emp-dash-stats {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 16px;
+            margin-bottom: 20px;
         }
-        .btn-tiny-red {
-            background: #fca5a5;
-            color: #991b1b;
-            border: none;
-            padding: 5px 15px;
-            border-radius: 20px;
-            font-size: 0.75rem;
-            font-weight: 600;
-            cursor: pointer;
+        @media (max-width: 1250px) { .emp-dash-stats { grid-template-columns: repeat(3, 1fr); } }
+        @media (max-width: 900px) { .emp-dash-stats { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 560px) { .emp-dash-stats { grid-template-columns: 1fr; } }
+        .emp-dash-stat {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-left: 4px solid var(--accent, #3b82f6);
+            border-radius: 14px;
+            padding: 18px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.03);
+            position: relative;
+            min-width: 0;
         }
+        .emp-dash-stat[onclick] { transition: transform 0.15s ease, box-shadow 0.15s ease; }
+        .emp-dash-stat[onclick]:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0,0,0,0.08); }
+        .emp-dash-stat .icon {
+            width: 46px; height: 46px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.1rem; flex-shrink: 0;
+        }
+        .emp-dash-stat h3 { margin: 0; font-size: 1.55rem; color: #0f172a; line-height: 1.1; }
+        .emp-dash-stat p { margin: 3px 0 0; font-size: 0.78rem; color: #64748b; font-weight: 600; }
 
-        .reminder-box {
-            background: #f1f5f9;
-            padding: 20px;
-            border-radius: 12px;
-            height: 100%;
+        /* ── Priority Levels strip ── */
+        .emp-priority-strip {
+            display: flex; align-items: center; gap: 22px; flex-wrap: wrap;
+            background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px;
+            padding: 14px 22px; margin-bottom: 20px;
         }
-        .reminder-box textarea {
-            width: 100%;
-            height: 150px;
-            border: none;
-            border-radius: 8px;
-            padding: 15px;
-            resize: none;
-            margin-bottom: 15px;
-            font-family: 'Inter', sans-serif;
+        .emp-priority-strip .pl-title {
+            display: flex; align-items: center; gap: 10px;
+            font-size: 0.95rem; font-weight: 700; color: #1e293b;
+            padding-right: 20px; border-right: 1px solid #e2e8f0;
         }
-        
-    </style>
+        .emp-priority-strip .pl-title i { color: #3b82f6; font-size: 1.05rem; }
+        .emp-priority-strip .pl-item { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: #475569; }
+        .emp-priority-strip .pl-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+        .emp-priority-strip .pl-item b { color: #0f172a; font-size: 0.95rem; }
+
+        /* ── Dashboard chart cards ── */
+        .emp-chart-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
+        .emp-chart-head .ch-title-row { display: flex; align-items: center; gap: 12px; min-width: 0; }
+        .emp-chart-head .ch-icon {
+            width: 40px; height: 40px; border-radius: 50%;
+            background: #eff6ff; color: #2563eb;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.95rem; flex-shrink: 0;
+        }
+        .emp-chart-head h4 { margin: 0; font-size: 1.02rem; font-weight: 700; color: #0f172a; }
+        .emp-chart-head .sub { color: #64748b; font-size: 0.8rem; margin-top: 3px; }
+        .emp-pill {
+            font-size: 0.75rem; font-weight: 700; color: #2563eb; background: #eff6ff;
+            border: 1px solid #dbeafe; padding: 5px 12px; border-radius: 999px;
+            white-space: nowrap; flex-shrink: 0; cursor: pointer; transition: background 0.12s ease;
+        }
+        .emp-pill:hover { background: #dbeafe; }
+        .emp-pill.static { cursor: default; }
+        .emp-pill.static:hover { background: #eff6ff; }
+        /* Custom date-range filter for the Registrations per Month chart */
+        .emp-regs-filter { display: flex; align-items: center; gap: 6px; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
+        .emp-regs-filter .frl { font-size: 0.72rem; font-weight: 700; color: #475569; white-space: nowrap; }
+        .emp-regs-filter input[type="date"] {
+            font-family: inherit; font-size: 0.74rem; font-weight: 600; color: #0f172a;
+            background: #f8fafc; border: 1px solid #dbeafe; border-radius: 8px;
+            padding: 5px 8px; outline: none; cursor: pointer; max-width: 132px;
+            transition: border-color 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
+        }
+        .emp-regs-filter input[type="date"]:hover { border-color: #93c5fd; }
+        .emp-regs-filter input[type="date"]:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.15); background: #ffffff; }
+        .emp-regs-btn {
+            font-family: inherit; font-size: 0.72rem; font-weight: 700; border-radius: 999px;
+            padding: 6px 12px; cursor: pointer; white-space: nowrap;
+            transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+        }
+        .emp-regs-btn.reset { background: #ffffff; color: #64748b; border: 1px solid #e2e8f0; }
+        .emp-regs-btn.reset:hover { color: #dc2626; border-color: #fecaca; background: #fef2f2; }
+        .emp-verify-body { display: flex; align-items: center; gap: 18px; }
+        .emp-verify-body .donut-side { position: relative; height: 250px; flex: 1.1; min-width: 0; }
+        .emp-legend-card {
+            flex: 1; background: #f8fafc; border: 1px solid #e2e8f0;
+            border-radius: 12px; padding: 12px 16px; min-width: 0;
+        }
+        .emp-legend-row {
+            display: flex; align-items: center; gap: 10px; padding: 10px 6px;
+            font-size: 0.88rem; color: #334155; cursor: pointer;
+            border-radius: 8px; transition: background 0.12s ease;
+        }
+        .emp-legend-row:hover { background: #eff6ff; }
+        .emp-legend-row .lg-dot { width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0; }
+        .emp-legend-row .lg-name { flex: 1; font-weight: 600; }
+        .emp-legend-row .lg-count { font-weight: 800; color: #0f172a; min-width: 24px; text-align: right; }
+        .emp-legend-row .lg-pct { color: #94a3b8; font-size: 0.8rem; min-width: 48px; text-align: right; }
+        @media (max-width: 720px) { .emp-verify-body { flex-direction: column; } .emp-verify-body .emp-legend-card { width: 100%; } }
+
+        /* ── Seniors by Priority Level section ── */
+        .emp-priority-sec {
+            background: white; border: 1px solid #e2e8f0; border-radius: 14px;
+            padding: 22px; box-shadow: 0 2px 10px rgba(0,0,0,0.02);
+            margin-top: 20px;
+        }
+        .emp-priority-filters { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+        .emp-prio-chip {
+            border: 1px solid #e2e8f0; background: #f8fafc; color: #475569;
+            font-size: 0.78rem; font-weight: 700; padding: 7px 14px; border-radius: 999px;
+            cursor: pointer; transition: all 0.15s ease; font-family: inherit;
+        }
+        .emp-prio-chip:hover { border-color: #93c5fd; color: #1d4ed8; }
+        .emp-prio-chip.active { background: #1e293b; border-color: #1e293b; color: white; }
+        .emp-prio-chip .cnt { opacity: 0.75; font-weight: 800; margin-left: 4px; }
+        .emp-prio-search {
+            border: 1.5px solid #e2e8f0; border-radius: 10px; padding: 8px 12px;
+            font-size: 0.85rem; font-family: inherit; outline: none; min-width: 220px;
+        }
+        .emp-prio-search:focus { border-color: #3b82f6; }
+        .emp-prio-grid {
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 16px;
+        }
+        @media (max-width: 1100px) { .emp-prio-grid { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 720px) { .emp-prio-grid { grid-template-columns: 1fr; } }
+        .emp-prio-card {
+            border: 1px solid #e2e8f0; border-left: 4px solid var(--pc, #22c55e);
+            border-radius: 12px; padding: 14px 16px; background: #fff;
+            cursor: pointer; transition: transform 0.12s ease, box-shadow 0.12s ease;
+        }
+        .emp-prio-card:hover { transform: translateY(-2px); box-shadow: 0 8px 18px rgba(0,0,0,0.08); }
+
+        .emp-charts-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        @media (max-width: 900px) { .emp-charts-grid { grid-template-columns: 1fr; } }
+        .emp-chart-card {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 14px;
+            padding: 22px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.02);
+        }
+        .emp-chart-card h4 { margin: 0 0 4px; color: #1e293b; font-size: 1rem; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+        .emp-chart-card .sub { color: #64748b; font-size: 0.8rem; margin-bottom: 14px; }
+        .emp-chart-wrap { position: relative; height: 260px; }
+        .emp-chart-wrap.tall { height: 280px; }
+
+    /* ── Health Records: staff priority level picker ── */
+    .health-priority-opt { transition: border-color 0.15s, background 0.15s, box-shadow 0.15s; }
+    .health-priority-opt:hover { border-color: #94a3b8 !important; }
+    .health-priority-opt.selected { border-color: #0ea5e9 !important; background: #f0f9ff !important; box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.12); }
+    .health-req-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #ef4444; margin-right: 6px; }
+</style>
 </head>
 
 <body>
@@ -275,13 +522,25 @@
 
         <!-- Center Navigation Pills -->
         <nav style="display: flex; gap: 5px; background: #f8fafc; padding: 8px; border-radius: 50px; border: 1px solid #e2e8f0;">
-            <a class="emp-nav-pill active" onclick="switchEmpTab('register', this)">Register Senior</a>
+            <a class="emp-nav-pill active" onclick="switchEmpTab('dashboard', this)">Dashboard</a>
+            <a class="emp-nav-pill" onclick="switchEmpTab('register', this)">Register Senior</a>
             <a class="emp-nav-pill" onclick="switchEmpTab('verify', this)" style="position: relative;">
                 Verify Documents
                 <span id="empVerifyBadge" style="display: none; position: absolute; top: 2px; right: 5px; width: 10px; height: 10px; background-color: #ef4444; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 5px rgba(239, 68, 68, 0.5);"></span>
             </a>
-            <a class="emp-nav-pill" onclick="switchEmpTab('process', this)">Process Benefits</a>
-            <a class="emp-nav-pill" onclick="switchEmpTab('health', this)">Health Records</a>
+            <a class="emp-nav-pill" onclick="switchEmpTab('process', this)" style="position: relative;">
+                Process Benefits
+                <span id="empProcessBadge" style="display: none; position: absolute; top: 2px; right: 5px; width: 10px; height: 10px; background-color: #ef4444; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 5px rgba(239, 68, 68, 0.5);"></span>
+            </a>
+            <a class="emp-nav-pill" onclick="switchEmpTab('health', this)" style="position: relative;">
+                Health Records
+                <span id="empHealthBadge" style="display: none; position: absolute; top: 2px; right: 5px; width: 10px; height: 10px; background-color: #ef4444; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 5px rgba(239, 68, 68, 0.5);"></span>
+            </a>
+
+            <a class="emp-nav-pill" onclick="switchEmpTab('archive', this)" title="Archive Function — inactive, deceased and transferred records">
+                <i class="fas fa-box-archive" style="margin-right: 6px;"></i>Archive
+            </a>
+
             <a class="emp-nav-pill" onclick="switchEmpTab('notifications', this)" style="position: relative;">
                 Notifications
                 <span id="empNotifBadge" style="display: none; position: absolute; top: 2px; right: 5px; width: 10px; height: 10px; background-color: #ef4444; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 5px rgba(239, 68, 68, 0.5);"></span>
@@ -302,27 +561,157 @@
         </div>
     </header>
 
-    <div class="dashboard-container" style="max-width: 1200px;">
+    <div class="dashboard-container" style="max-width: 1400px;">
+
+        <!-- TAB 0: DASHBOARD OVERVIEW -->
+        <div id="tab-dashboard" class="tab-content">
+            <!-- Stat cards -->
+            <div class="emp-dash-stats">
+                <div class="emp-dash-stat" style="--accent:#3b82f6;">
+                    <div class="icon" style="background:#eff6ff; color:#2563eb;"><i class="fas fa-users"></i></div>
+                    <div style="min-width:0;">
+                        <h3 id="dashTotalSeniors">0</h3>
+                        <p>Total Senior Accounts</p>
+                    </div>
+                </div>
+                <div class="emp-dash-stat" style="--accent:#10b981; cursor:pointer;" onclick="switchEmpTab('verify', document.querySelectorAll('.emp-nav-pill')[2]);" title="Go to Verify Documents">
+                    <div class="icon" style="background:#ecfdf5; color:#059669;"><i class="fas fa-file-invoice"></i></div>
+                    <div style="min-width:0;">
+                        <h3 id="dashDocsToVerify">0</h3>
+                        <p>Documents to Verify</p>
+                    </div>
+                </div>
+                <div class="emp-dash-stat" style="--accent:#f59e0b;">
+                    <div class="icon" style="background:#fffbeb; color:#d97706;"><i class="fas fa-calendar-alt"></i></div>
+                    <div style="min-width:0;">
+                        <h3 id="dashPendingAppointments">0</h3>
+                        <p>Pending Appointments</p>
+                    </div>
+                </div>
+                <div class="emp-dash-stat" style="--accent:#8b5cf6;">
+                    <div class="icon" style="background:#f5f3ff; color:#7c3aed;"><i class="fas fa-hand-holding-heart"></i></div>
+                    <div style="min-width:0;">
+                        <h3 id="dashPendingAssistance">0</h3>
+                        <p>Pending Assistance</p>
+                    </div>
+                </div>
+                <div class="emp-dash-stat" style="--accent:#64748b; cursor:pointer;" onclick="switchEmpTab('archive', document.querySelectorAll('.emp-nav-pill')[5]);" title="Go to Archive — only ACTIVE seniors appear in the main dashboard">
+                    <div class="icon" style="background:#f1f5f9; color:#475569;"><i class="fas fa-box-archive"></i></div>
+                    <div style="min-width:0;">
+                        <h3 id="dashArchivedCount">0</h3>
+                        <p>Archived Records</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Priority breakdown strip (age-based: ≤89 Low, 90–99 Medium, 100+ High) -->
+            <div class="emp-priority-strip">
+                <span class="pl-title"><i class="far fa-star"></i> Priority Levels</span>
+                <span class="pl-item"><span class="pl-dot" style="background:#ef4444;"></span>High (100+ yrs): <b id="dashHighCount">0</b></span>
+                <span class="pl-item"><span class="pl-dot" style="background:#f59e0b;"></span>Medium (90–99): <b id="dashMediumCount">0</b></span>
+                <span class="pl-item"><span class="pl-dot" style="background:#22c55e;"></span>Low (≤89): <b id="dashLowCount">0</b></span>
+            </div>
+
+            <div class="emp-charts-grid">
+                <div class="emp-chart-card">
+                    <div class="emp-chart-head">
+                        <div class="ch-title-row">
+                            <div class="ch-icon"><i class="fas fa-users"></i></div>
+                            <div style="min-width:0;">
+                                <h4>Seniors by Verification Status</h4>
+                                <div class="sub">Share of Verified / Pending / Unverified accounts &rarr; click a segment to view seniors</div>
+                            </div>
+                        </div>
+                        <span class="emp-pill" onclick="window.openSeniorListModal('all');" title="View all senior accounts" id="dashVerifyTotalPill">Total: 0</span>
+                    </div>
+                    <div class="emp-verify-body">
+                        <div class="donut-side"><canvas id="chartVerifyPie"></canvas></div>
+                        <div class="emp-legend-card">
+                            <div class="emp-legend-row" onclick="window.openSeniorListModal('verification', 'Verified');" title="View Verified seniors">
+                                <span class="lg-dot" style="background:#22c55e;"></span>
+                                <span class="lg-name">Verified</span>
+                                <span class="lg-count" id="legendVerifiedCount">0</span>
+                                <span class="lg-pct" id="legendVerifiedPct">0.0%</span>
+                            </div>
+                            <div class="emp-legend-row" onclick="window.openSeniorListModal('verification', 'Pending');" title="View Pending Review seniors">
+                                <span class="lg-dot" style="background:#f59e0b;"></span>
+                                <span class="lg-name">Pending Review</span>
+                                <span class="lg-count" id="legendPendingCount">0</span>
+                                <span class="lg-pct" id="legendPendingPct">0.0%</span>
+                            </div>
+                            <div class="emp-legend-row" onclick="window.openSeniorListModal('verification', 'Unverified');" title="View Unverified seniors">
+                                <span class="lg-dot" style="background:#94a3b8;"></span>
+                                <span class="lg-name">Unverified</span>
+                                <span class="lg-count" id="legendUnverifiedCount">0</span>
+                                <span class="lg-pct" id="legendUnverifiedPct">0.0%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="emp-chart-card">
+                    <div class="emp-chart-head">
+                        <div class="ch-title-row">
+                            <div class="ch-icon"><i class="fas fa-calendar-alt"></i></div>
+                            <div style="min-width:0;">
+                                <h4>Registrations per Month</h4>
+                                <div class="sub" id="regsChartSub">New senior accounts in the last 6 months &rarr; click a month to view seniors</div>
+                            </div>
+                        </div>
+                        <div class="emp-regs-filter" id="empRegsFilter">
+                            <span class="frl">From</span>
+                            <input type="date" id="regsFilterFrom" aria-label="Filter registrations from date" title="Start of the date range">
+                            <span class="frl">To</span>
+                            <input type="date" id="regsFilterTo" aria-label="Filter registrations to date" title="End of the date range">
+                            <button type="button" class="emp-regs-btn reset" id="regsFilterReset" title="Clear the custom date filter and show the last 6 months" style="display:none;"><i class="fas fa-undo" style="margin-right:4px;"></i>Reset</button>
+                        </div>
+                    </div>
+                    <div class="emp-chart-wrap tall"><canvas id="chartRegsBar"></canvas></div>
+                </div>
+            </div>
+
+            <!-- Seniors by Priority Level: browse + open full senior profile -->
+            <div class="emp-priority-sec">
+                <div class="emp-chart-head">
+                    <div class="ch-title-row">
+                        <div class="ch-icon" style="background:#fef2f2; color:#dc2626;"><i class="fas fa-layer-group"></i></div>
+                        <div style="min-width:0;">
+                            <h4>Seniors by Priority Level</h4>
+                            <div class="sub">All active seniors grouped by High / Medium / Low priority &rarr; click a senior to view recent transactions, requests, full transaction history, assistance received, account creation date and verification date</div>
+                        </div>
+                    </div>
+                    <span class="emp-pill static" id="prioritySeniorsTotalPill">Total: 0</span>
+                </div>
+                <div style="display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; align-items:center; margin-top:12px;">
+                    <div class="emp-priority-filters" id="priorityFilterChips">
+                        <button type="button" class="emp-prio-chip active" data-prio-filter="All" onclick="window.setPrioritySeniorFilter('All', this)">All<span class="cnt" id="prioCountAll">0</span></button>
+                        <button type="button" class="emp-prio-chip" data-prio-filter="High" onclick="window.setPrioritySeniorFilter('High', this)"><span class="pl-dot" style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#ef4444; margin-right:6px;"></span>High<span class="cnt" id="prioCountHigh">0</span></button>
+                        <button type="button" class="emp-prio-chip" data-prio-filter="Medium" onclick="window.setPrioritySeniorFilter('Medium', this)"><span class="pl-dot" style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#f59e0b; margin-right:6px;"></span>Medium<span class="cnt" id="prioCountMedium">0</span></button>
+                        <button type="button" class="emp-prio-chip" data-prio-filter="Low" onclick="window.setPrioritySeniorFilter('Low', this)"><span class="pl-dot" style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#22c55e; margin-right:6px;"></span>Low<span class="cnt" id="prioCountLow">0</span></button>
+                    </div>
+                    <input type="text" id="prioritySeniorSearch" class="emp-prio-search" placeholder="Search name, OSCA ID, email..." oninput="window.setPrioritySeniorSearch(this.value)">
+                </div>
+                <div id="prioritySeniorsGrid" class="emp-prio-grid">
+                    <div style="grid-column:1/-1; text-align:center; color:#64748b; padding:20px;">Loading seniors...</div>
+                </div>
+            </div>
+        </div>
 
         <!-- TAB 1: REGISTER SENIOR -->
-        <div id="tab-register" class="tab-content">
+        <div id="tab-register" class="tab-content" style="display: none;">
             <div class="stats-row" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 40px;">
-                <div class="stat-box" style="border: 1px solid #e2e8f0; box-shadow: none;">
-                    <div class="icon stat-blue" style="background: #e0f2fe; color: #38bdf8;"><i class="fas fa-user-plus"></i></div>
+                <div class="stat-box" style="border: 1px solid #d4d4d8; box-shadow: none; border-radius: 6px;">
                     <div class="stat-info">
                         <h3 id="statThisMonth" style="font-size: 1.8rem; margin-bottom: 2px;">0</h3>
                         <p style="font-size: 0.95rem;">This Month</p>
                     </div>
                 </div>
-                <div class="stat-box" style="border: 1px solid #e2e8f0; box-shadow: none;">
-                    <div class="icon stat-green" style="background: #dcfce7; color: #22c55e;"><i class="fas fa-check-circle"></i></div>
+                <div class="stat-box" style="border: 1px solid #d4d4d8; box-shadow: none; border-radius: 6px;">
                     <div class="stat-info">
                         <h3 id="statTotalRegistered" style="font-size: 1.8rem; margin-bottom: 2px;">0</h3>
                         <p style="font-size: 0.95rem;">Total Registered</p>
                     </div>
                 </div>
-                <div class="stat-box" style="border: 1px solid #e2e8f0; box-shadow: none;">
-                    <div class="icon stat-warning" style="background: #fef9c3; color: #eab308;"><i class="fas fa-clock"></i></div>
+                <div class="stat-box" style="border: 1px solid #d4d4d8; box-shadow: none; border-radius: 6px;">
                     <div class="stat-info">
                         <h3 id="statPending" style="font-size: 1.8rem; margin-bottom: 2px;">0</h3>
                         <p style="font-size: 0.95rem;">Pending Verification</p>
@@ -330,34 +719,26 @@
                 </div>
             </div>
 
-            <div id="registerFormArea" style="background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.03);">
+            <div id="registerFormArea" style="background: white; padding: 40px; border-radius: 6px; border: 1px solid #d4d4d8; box-shadow: none;">
                 <!-- Initial CTA Button -->
                 <div id="registerCTA" style="text-align: center; padding: 20px 0;">
-                    <div style="width: 80px; height: 80px; border-radius: 50%; background: #dcfce7; color: #22c55e; display: flex; justify-content: center; align-items: center; font-size: 2rem; margin: 0 auto 20px;">
-                        <i class="fas fa-user-plus"></i>
-                    </div>
                     <h2 style="color: #1e293b; margin-bottom: 10px;">Register New Senior Citizen</h2>
-                    <p style="color: #64748b; margin-bottom: 25px;">Manually create an account for a senior citizen who doesn't have a phone or internet access.</p>
-                    <button id="startRegBtn" class="btn" style="background: #059669; color: white; padding: 12px 30px; font-size: 1.05rem;"><i class="fas fa-play" style="font-size: 0.8rem; margin-right: 5px;"></i> Start Registration</button>
+                    <p style="color: #52525b; margin-bottom: 25px;">Manually create an account for a senior citizen who doesn't have a phone or internet access.</p>
+                    <button id="startRegBtn" class="btn" style="background: #1e293b; color: white; padding: 12px 30px; font-size: 1.05rem; border-radius: 4px;">Start Registration</button>
                 </div>
 
                 <!-- Registration Form (hidden initially) -->
                 <div id="registerFormContent" style="display: none;">
-                    <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #f1f5f9;">
-                        <div style="width: 50px; height: 50px; border-radius: 12px; background: #dcfce7; color: #22c55e; display: flex; justify-content: center; align-items: center; font-size: 1.3rem;">
-                            <i class="fas fa-user-plus"></i>
-                        </div>
-                        <div>
-                            <h3 style="margin: 0; color: #1e293b; font-size: 1.15rem;">Walk-in Senior Registration</h3>
-                            <p style="margin: 4px 0 0; color: #64748b; font-size: 0.85rem;">Fill out the details provided by the senior citizen. Account will be activated immediately.</p>
-                        </div>
+                    <div style="margin-bottom: 30px; padding-bottom: 15px; border-bottom: 2px solid #1e293b;">
+                        <h3 style="margin: 0; color: #1e293b; font-size: 1.15rem;">Walk-in Senior Registration</h3>
+                        <p style="margin: 4px 0 0; color: #52525b; font-size: 0.85rem;">Fill out the details provided by the senior citizen. Account will be activated immediately.</p>
                     </div>
 
                     <form id="empRegisterForm">
                         <!-- Section A: Account Credentials -->
                         <div style="margin-bottom: 25px;">
-                            <h4 style="color: #1e40af; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 15px; font-weight: 700;">
-                                <i class="fas fa-key" style="margin-right: 6px;"></i> Account Credentials
+                            <h4 style="color: #1e293b; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 15px; font-weight: 700; border-bottom: 1px solid #d4d4d8; padding-bottom: 6px;">
+                                Account Credentials
                             </h4>
                             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
                                 <div style="grid-column: span 2;">
@@ -377,8 +758,8 @@
 
                         <!-- Section B: Personal Information -->
                         <div style="margin-bottom: 25px;">
-                            <h4 style="color: #059669; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 15px; font-weight: 700;">
-                                <i class="fas fa-id-card" style="margin-right: 6px;"></i> Personal Information
+                            <h4 style="color: #1e293b; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 15px; font-weight: 700; border-bottom: 1px solid #d4d4d8; padding-bottom: 6px;">
+                                Personal Information
                             </h4>
                             <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px;">
                                 <div style="grid-column: span 3;">
@@ -428,8 +809,8 @@
 
                         <!-- Section B2: Address & Contact -->
                         <div style="margin-bottom: 25px;">
-                            <h4 style="color: #7c3aed; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 15px; font-weight: 700;">
-                                <i class="fas fa-map-marker-alt" style="margin-right: 6px;"></i> Address & Contact
+                            <h4 style="color: #1e293b; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 15px; font-weight: 700; border-bottom: 1px solid #d4d4d8; padding-bottom: 6px;">
+                                Address &amp; Contact
                             </h4>
                             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
                                 <div style="grid-column: span 2;">
@@ -469,15 +850,14 @@
 
                         <!-- Section C: Face Scan (Required) -->
                         <div style="margin-bottom: 25px;">
-                            <h4 style="color: #dc2626; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 15px; font-weight: 700;">
-                                <i class="fas fa-camera" style="margin-right: 6px;"></i> Face Scan <span style="color: #ef4444;">(Required)</span>
+                            <h4 style="color: #1e293b; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 15px; font-weight: 700; border-bottom: 1px solid #d4d4d8; padding-bottom: 6px;">
+                                Face Scan <span style="color: #b91c1c;">(Required)</span>
                             </h4>
                             <div style="background: #1e293b; border-radius: 14px; overflow: hidden; position: relative; max-width: 400px; margin: 0 auto;">
                                 <!-- Camera Feed -->
                                 <div id="regCameraFrame" style="position: relative; width: 100%; aspect-ratio: 3/4; background: #0f172a; display: flex; justify-content: center; align-items: center;">
                                     <video id="regVideo" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover; display: none;"></video>
                                     <div id="regCameraPlaceholder" style="display: flex; flex-direction: column; align-items: center; gap: 10px; color: #64748b;">
-                                        <i class="fas fa-camera" style="font-size: 2.5rem;"></i>
                                         <span style="font-size: 0.9rem; font-weight: 600;">Camera is off</span>
                                     </div>
                                     <!-- Face guide oval -->
@@ -495,33 +875,32 @@
 
                                 <!-- Camera controls -->
                                 <div style="padding: 12px;">
-                                    <button type="button" id="regScanFaceBtn" style="width: 100%; padding: 14px; background: linear-gradient(135deg, #22c55e, #16a34a); color: white; border: none; border-radius: 10px; font-size: 1rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; font-family: 'Inter', sans-serif; box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3); transition: all 0.2s;">
-                                        <i class="fas fa-user-check"></i> Start Camera & Scan Face
+                                    <button type="button" id="regScanFaceBtn" style="width: 100%; padding: 14px; background: #1e293b; color: white; border: none; border-radius: 4px; font-size: 1rem; font-weight: 600; cursor: pointer; font-family: 'Inter', sans-serif; transition: all 0.2s;">
+                                        Start Camera &amp; Scan Face
                                     </button>
-                                    <button type="button" id="regRetakeBtn" style="display: none; width: 100%; padding: 10px; margin-top: 8px; background: transparent; color: #94a3b8; border: 1px solid #334155; border-radius: 8px; font-size: 0.85rem; font-weight: 600; cursor: pointer; font-family: 'Inter', sans-serif;">
-                                        <i class="fas fa-redo"></i> Retake Photo
+                                    <button type="button" id="regRetakeBtn" style="display: none; width: 100%; padding: 10px; margin-top: 8px; background: transparent; color: #94a3b8; border: 1px solid #334155; border-radius: 4px; font-size: 0.85rem; font-weight: 600; cursor: pointer; font-family: 'Inter', sans-serif;">
+                                        Retake Photo
                                     </button>
                                 </div>
                             </div>
                             <!-- Face scan status -->
                             <div id="regFaceStatus" style="text-align: center; margin-top: 12px; font-size: 0.85rem; font-weight: 600; color: #ef4444;">
-                                <i class="fas fa-exclamation-circle"></i> Face scan is required before submitting
+                                Face scan is required before submitting
                             </div>
                         </div>
 
                         <!-- Info Banner -->
-                        <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px; padding: 14px 18px; margin-bottom: 25px; display: flex; align-items: flex-start; gap: 12px;">
-                            <i class="fas fa-info-circle" style="color: #3b82f6; font-size: 1.1rem; margin-top: 2px;"></i>
-                            <div style="font-size: 0.85rem; color: #1e40af; line-height: 1.5;">
+                        <div style="background: #fafafa; border: 1px solid #d4d4d8; border-radius: 4px; padding: 14px 18px; margin-bottom: 25px;">
+                            <div style="font-size: 0.85rem; color: #3f3f46; line-height: 1.5;">
                                 <strong>Walk-in Registration:</strong> This account will be activated immediately — no email verification or admin approval needed. Please hand the login credentials to the senior citizen.
                             </div>
                         </div>
 
                         <!-- Action Buttons -->
                         <div style="display: flex; gap: 12px; justify-content: flex-end;">
-                            <button type="button" id="cancelRegBtn" style="padding: 12px 25px; border: 1.5px solid #e2e8f0; border-radius: 10px; background: white; color: #64748b; font-weight: 600; font-size: 0.95rem; cursor: pointer; font-family: 'Inter', sans-serif;">Cancel</button>
-                            <button type="submit" id="submitRegBtn" style="padding: 12px 30px; border: none; border-radius: 10px; background: linear-gradient(135deg, #059669, #10b981); color: white; font-weight: 700; font-size: 0.95rem; cursor: pointer; font-family: 'Inter', sans-serif; box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3); display: flex; align-items: center; gap: 8px;">
-                                <i class="fas fa-user-check"></i> Create Senior Account
+                            <button type="button" id="cancelRegBtn" style="padding: 12px 25px; border: 1px solid #a1a1aa; border-radius: 4px; background: white; color: #3f3f46; font-weight: 600; font-size: 0.95rem; cursor: pointer; font-family: 'Inter', sans-serif;">Cancel</button>
+                            <button type="submit" id="submitRegBtn" style="padding: 12px 30px; border: none; border-radius: 4px; background: #1e293b; color: white; font-weight: 600; font-size: 0.95rem; cursor: pointer; font-family: 'Inter', sans-serif;">
+                                Create Senior Account
                             </button>
                         </div>
                     </form>
@@ -531,9 +910,46 @@
 
         <!-- TAB 2: VERIFY DOCUMENTS -->
         <div id="tab-verify" class="tab-content" style="display: none;">
+
+            <!-- QR DIGITAL ID VERIFICATION (INSTANT IDENTITY + ELIGIBILITY CHECK) -->
+            <div style="background: white; padding: 30px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.02); margin-bottom: 25px; border: 1px solid #e2e8f0;">
+                <h3 style="margin-bottom: 5px; color: #1e293b; font-size: 1.1rem; border-bottom: 2px solid #1e293b; padding-bottom: 10px;">
+                    Scan Senior Digital ID
+                </h3>
+                <p style="color: #64748b; font-size: 0.85rem; margin-bottom: 20px;">
+                    Point the camera at the senior's QR code (Senior Portal &gt; Profile &gt; Scan for Verification) or enter the code / Senior ID manually for instant identity verification and real-time eligibility check.
+                </p>
+                <div style="display: flex; gap: 25px; flex-wrap: wrap;">
+                    <div style="flex: 1; min-width: 300px; max-width: 420px;">
+                        <div id="qrScanFrame" style="position: relative; width: 100%; aspect-ratio: 4/3; background: #0f172a; border-radius: 12px; overflow: hidden; display: flex; align-items: center; justify-content: center;">
+                            <video id="qrScanVideo" autoplay playsinline muted style="width: 100%; height: 100%; object-fit: cover; display: none;"></video>
+                            <div id="qrScanPlaceholder" style="display: flex; flex-direction: column; align-items: center; gap: 10px; color: #64748b;">
+                                <span style="font-size: 0.85rem; font-weight: 600;">Camera is off</span>
+                            </div>
+                            <div id="qrScanGuide" style="display: none; position: absolute; inset: 0; pointer-events: none;">
+                                <div style="position: absolute; left: 50%; top: 50%; width: 220px; height: 220px; transform: translate(-50%,-50%); border: 3px solid rgba(37,99,235,0.9); border-radius: 14px; box-shadow: 0 0 0 9999px rgba(15,23,42,0.45);"></div>
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 10px; margin-top: 12px;">
+                            <button type="button" id="startQrScanBtn" style="flex: 1; border: none; background: #1e293b; color: white; padding: 10px 14px; border-radius: 4px; font-weight: 600; font-size: 0.85rem; cursor: pointer;">Start Scanning</button>
+                            <button type="button" id="stopQrScanBtn" style="flex: 1; border: none; background: #b91c1c; color: white; padding: 10px 14px; border-radius: 4px; font-weight: 600; font-size: 0.85rem; cursor: pointer; display: none;">Stop</button>
+                        </div>
+                    </div>
+                    <div style="flex: 1; min-width: 280px;">
+                        <label style="display: block; font-size: 0.8rem; font-weight: 700; color: #475569; margin-bottom: 6px;">Or enter manually</label>
+                        <div style="display: flex; gap: 8px;">
+                            <input type="text" id="qrManualInput" placeholder="Paste QR code or Senior ID (e.g. 123132)" style="flex: 1; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.9rem; outline: none;">
+                            <button type="button" id="qrManualVerifyBtn" style="border: none; background: #1e293b; color: white; padding: 10px 16px; border-radius: 4px; font-weight: 600; font-size: 0.85rem; cursor: pointer;">Verify</button>
+                        </div>
+                        <div id="qrVerifyStatus" style="margin-top: 14px; font-size: 0.85rem; color: #64748b;">Ready. Scan a QR code or enter a Senior ID.</div>
+                    </div>
+                </div>
+                <div id="qrVerifyResult" style="margin-top: 20px;"></div>
+            </div>
+
             <!-- Account Verifications (existing) -->
             <div style="background: white; padding: 30px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.02); margin-bottom: 25px;">
-                <h3 style="margin-bottom: 25px; color: #1e293b; font-size: 1.1rem;"><i class="fas fa-user-check" style="color: #3b82f6; margin-right: 8px;"></i>Account Pending Verifications</h3>
+                <h3 style="margin-bottom: 25px; color: #1e293b; font-size: 1.1rem; border-bottom: 2px solid #1e293b; padding-bottom: 10px;">Account Pending Verifications</h3>
                 <div id="verifyListContainer">
                     <div style="text-align: center; color: #64748b; padding: 20px;">Loading pending verifications...</div>
                 </div>
@@ -541,9 +957,9 @@
 
             <!-- KYC Identity Verifications (NEW) -->
             <div style="background: white; padding: 30px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.02);">
-                <h3 style="margin-bottom: 25px; color: #1e293b; font-size: 1.1rem; display: flex; align-items: center; gap: 10px;">
-                    <i class="fas fa-id-card-clip" style="color: #8b5cf6;"></i> KYC Identity Verification
-                    <span id="kycPendingCount" style="background: #fee2e2; color: #ef4444; padding: 2px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: 700; display: none;">0</span>
+                <h3 style="margin-bottom: 25px; color: #1e293b; font-size: 1.1rem; border-bottom: 2px solid #1e293b; padding-bottom: 10px;">
+                    KYC Identity Verification
+                    <span id="kycPendingCount" style="background: #1e293b; color: #ffffff; padding: 1px 9px; border-radius: 3px; font-size: 0.78rem; font-weight: 700; display: none; margin-left: 6px;">0</span>
                 </h3>
                 <div id="kycVerifyListContainer">
                     <div style="text-align: center; color: #64748b; padding: 20px;">Loading KYC submissions...</div>
@@ -551,22 +967,110 @@
             </div>
         </div>
 
-        <!-- TAB 3: PROCESS BENEFITS -->
+        <!-- TAB 3: PROCESS BENEFITS — ledger board (same functions, manageable layout) -->
         <div id="tab-process" class="tab-content" style="display: none;">
-            <div style="background: white; padding: 30px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.02); margin-bottom: 25px;">
-                <h3 style="margin-bottom: 25px; color: #1e293b; font-size: 1.1rem;">Benefits Processing</h3>
-                <div id="processListContainer">
-                    <div style="text-align: center; color: #64748b; padding: 20px;">Loading benefits data...</div>
+            <div class="pb-ledger" aria-label="Process Benefits ledger">
+                <div class="pb-ledger-toolbar">
+                    <div class="pb-ledger-title">
+                        <h3>Benefits Processing</h3>
+                        <p>Same workflow, manageable board: <strong>Monthly Pension</strong> &rarr; <strong>Claimed Monthly Pension</strong> &rarr; <strong>Approved Assistance Claims</strong>.</p>
+                    </div>
+                    <div class="pb-ledger-tools">
+                        <input id="processBenefitsSearch" class="pb-search" type="text" placeholder="Search name, ID, claim, ref..." aria-label="Search board">
+                        <button type="button" class="pb-btn" id="processBenefitsRefresh" title="Re-count board"><i class="fas fa-rotate"></i> Refresh</button>
+                        <button type="button" class="pb-btn pb-btn-dark" id="processBenefitsExport" title="Download visible data as CSV"><i class="fas fa-file-csv"></i> Export CSV</button>
+                        <button type="button" class="pb-btn" id="processBenefitsPrint" title="Print board"><i class="fas fa-print"></i> Print</button>
+                    </div>
                 </div>
-            </div>
-
-            <!-- Welfare Assistance Claims Section -->
-            <div style="background: white; padding: 30px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.02);">
-                <h3 style="margin-bottom: 25px; color: #2563eb; font-size: 1.1rem; display: flex; align-items: center; gap: 10px;">
-                    <i class="fas fa-hand-holding-heart"></i> Welfare Assistance Claims from Seniors
-                </h3>
-                <div id="claimsListContainer">
-                    <div style="text-align: center; color: #64748b; padding: 20px;">Loading claims data...</div>
+                <div class="pb-stat-strip" aria-label="Board totals" style="margin-bottom:20px;">
+                    <div><b id="pbStatPendingSetup">0</b><span>Pending Pension Setup</span></div>
+                    <div><b id="pbStatWithPension">0</b><span>With Monthly Pension</span></div>
+                    <div><b id="pbStatToPayout">0</b><span>Assistance To Payout</span></div>
+                    <div><b id="pbStatClaimed">0</b><span>Assistance Claimed</span></div>
+                </div>
+                <!-- ROW 1 (full width): Monthly Pension setup tables -->
+                <div class="pb-section">
+                    <div class="pb-section-head">
+                        <span>Monthly Pension <span class="pb-count" id="pbCountCol1">0</span>
+                            <span class="pb-sub">Pending Account + Senior Accounts with Monthly Pension — full width so columns never squeeze</span>
+                        </span>
+                        <span class="pb-mini" id="pbMiniPending">0 waiting</span>
+                    </div>
+                    <div class="pb-section-body">
+                        <p class="pb-subhead">Pending Account</p>
+                        <span id="pensionSetupBadge" style="display:none;">0</span>
+                        <div id="pensionSetupContainer" class="pb-wide-table">
+                            <div style="text-align: center; color: #71717a; padding: 20px;">Loading senior data...</div>
+                        </div>
+                        <p class="pb-subhead" style="margin-top:18px;">Senior Accounts with Monthly Pension <span class="pb-mini" id="pbMiniConfigured">0 active</span></p>
+                        <div id="pensionConfiguredContainer" class="pb-wide-table">
+                            <div style="text-align: center; color: #71717a; padding: 14px;">No pensions configured yet.</div>
+                        </div>
+                    </div>
+                </div>
+                <!-- ROW 2 (full width): Claimed Monthly Pension -->
+                <div class="pb-section">
+                    <div class="pb-section-head">
+                        <span>Claimed Monthly Pension <span class="pb-count" id="pbCountCol2">0</span>
+                            <span class="pb-sub">Released pension payouts (read-only, built from the same benefits data)</span>
+                        </span>
+                        <span class="pb-mini" id="pbMiniClaimedPension">0 released</span>
+                    </div>
+                    <div class="pb-section-body">
+                        <div id="pensionClaimedContainer" style="max-height:380px; overflow-y:auto; overflow-x:hidden; display:flex; flex-direction:column; gap:10px;">
+                            <div style="text-align:center; color:#71717a; padding:18px 12px; border:1px dashed #d4d4d8; border-radius:4px; font-size:0.85rem;">No claimed pension payouts yet.<br>Released monthly pensions appear here.</div>
+                        </div>
+                    </div>
+                </div>
+                <!-- ROW 3: Approved Assistance Claims — title centered above the 2 cards (no separate box) -->
+                <div style="margin: 0 24px 20px;">
+                    <div style="text-align:center; margin-bottom:12px;">
+                        <div style="font-weight:700; color:#111827; font-size:0.95rem;">Approved Assistance Claims <span class="pb-count" id="approvedClaimsBadge">0</span></div>
+                        <div style="font-size:0.76rem; color:#64748b; margin-top:2px;">Left = waiting for payout &bull; Right = already claimed</div>
+                    </div>
+                    <div class="pb-split" style="margin:0;">
+                        <div class="pb-card">
+                            <div class="pb-card-head">
+                                <span>Not Claimed Yet</span>
+                                <span class="pb-mini" id="pbMiniToPayout">0 ready</span>
+                            </div>
+                            <div class="pb-card-body">
+                                <div id="claimsPayoutContainer">
+                                    <div style="text-align: center; color: #71717a; padding: 20px;">No approved assistance claims waiting for payout.</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="pb-card">
+                            <div class="pb-card-head"><span>Claimed</span><span class="pb-mini" id="pbMiniClaimed">0 done</span></div>
+                            <div class="pb-card-body">
+                                <div id="claimsClaimedContainer">
+                                    <div style="text-align: center; color: #71717a; padding: 20px;">No claimed assistance claims yet.</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="pb-foot-row">
+                    <button type="button" class="pb-foot-head" id="pbPendingToggle" aria-expanded="true">
+                        <span>Welfare Assistance Claims — Pending Approval <span class="pb-count" id="pbCountPending">0</span></span>
+                        <span style="font-size:0.78rem; color:#52525b;"><i class="fas fa-chevron-up" id="pbPendingChevron"></i> <span id="pbPendingHint">hide</span></span>
+                    </button>
+                    <div class="pb-foot-body" id="pbPendingBody">
+                        <div id="claimsListContainer">
+                            <div style="text-align: center; color: #71717a; padding: 20px;">Loading claims data...</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="pb-foot-row">
+                    <button type="button" class="pb-foot-head" id="pbHistoryToggle" aria-expanded="true">
+                        <span>History of Claim <span class="pb-count" id="pbCountHistory">0</span></span>
+                        <span style="font-size:0.78rem; color:#52525b;"><i class="fas fa-chevron-up" id="pbHistoryChevron"></i> <span id="pbHistoryHint">hide</span></span>
+                    </button>
+                    <div class="pb-foot-body" id="pbHistoryBody">
+                        <div id="claimsHistoryContainer">
+                            <div style="text-align: center; color: #71717a; padding: 20px;">No claim history yet.</div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -575,67 +1079,264 @@
         <div id="tab-health" class="tab-content" style="display: none;">
             <div style="background: white; padding: 40px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.02);">
                 
-                <div style="display: flex; align-items: center; gap: 20px; margin-bottom: 40px;">
-                    <div style="width: 70px; height: 70px; background: #fee2e2; border-radius: 12px; display: flex; justify-content: center; align-items: center; font-size: 2rem; color: #ef4444;">
-                        <i class="fas fa-heart"></i>
+                <div style="margin-bottom: 0; border-bottom: 2px solid #1e293b; padding-bottom: 15px;">
+                    <h3 style="margin: 0; color: #1e293b; font-size: 1.2rem;">Health Records Management</h3>
+                    <p style="margin: 5px 0 0; color: #52525b;">Approve senior checkup appointments, review submitted medical certifications, and set each senior's official health condition and priority level</p>
+                </div>
+
+                <!-- Health Overview — live counts, clickable shortcuts -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; margin: 22px 0;">
+                    <div class="emp-dash-stat" style="--accent:#ef4444; cursor:pointer;" onclick="window.switchHealthSubTab('appointments')" title="Go to appointment requests">
+                        <div class="icon" style="background:#fef2f2; color:#dc2626;"><i class="fas fa-calendar-check"></i></div>
+                        <div style="min-width:0;">
+                            <h3 id="healthStatPendingAppt">0</h3>
+                            <p>Requests to Approve</p>
+                        </div>
                     </div>
-                    <div>
-                        <h3 style="margin: 0; color: #1e293b; font-size: 1.2rem;">Health Records Update Management</h3>
-                        <p style="margin: 5px 0 0; color: #64748b;">Update and monitor senior health information</p>
+                    <div class="emp-dash-stat" style="--accent:#f59e0b; cursor:pointer;" onclick="window.switchHealthSubTab('appointments')" title="Approved appointments awaiting the senior's visit">
+                        <div class="icon" style="background:#fffbeb; color:#d97706;"><i class="fas fa-clock"></i></div>
+                        <div style="min-width:0;">
+                            <h3 id="healthStatUpcomingAppt">0</h3>
+                            <p>Approved — Awaiting Visit</p>
+                        </div>
+                    </div>
+                    <div class="emp-dash-stat" style="--accent:#3b82f6; cursor:pointer;" onclick="window.jumpToHealthFilter('pending')" title="Review submitted medical certifications">
+                        <div class="icon" style="background:#eff6ff; color:#2563eb;"><i class="fas fa-file-medical"></i></div>
+                        <div style="min-width:0;">
+                            <h3 id="healthStatPendingCert">0</h3>
+                            <p>Certifications to Review</p>
+                        </div>
+                    </div>
+                    <div class="emp-dash-stat" style="--accent:#8b5cf6; cursor:pointer;" onclick="window.jumpToHealthFilter('high')" title="Verified seniors currently marked High Priority">
+                        <div class="icon" style="background:#f5f3ff; color:#7c3aed;"><i class="fas fa-heart-pulse"></i></div>
+                        <div style="min-width:0;">
+                            <h3 id="healthStatHighPrio">0</h3>
+                            <p>High-Priority Seniors</p>
+                        </div>
                     </div>
                 </div>
 
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px;">
-                    <div>
-                        <h4 style="margin-bottom: 15px; color: #1e293b;">Critical Health Alerts</h4>
-                        <div class="health-alert-box">
-                            <h4><i class="fas fa-exclamation-circle" style="color: #ef4444;"></i> 3 seniors require immediate attention</h4>
-                            <p onclick="window.openHealthAlertsModal()" style="cursor:pointer; color:#ef4444; font-weight:600;">View List &rarr;</p>
+                <!-- Sub-tab navigation (keeps the tab manageable — one workflow at a time) -->
+                <div style="display: flex; gap: 6px; background: #f1f5f9; padding: 6px; border-radius: 10px; border: 1px solid #e2e8f0; margin-bottom: 24px; width: fit-content; max-width: 100%; flex-wrap: wrap;">
+                    <button type="button" id="healthSubTabBtnAppointments" onclick="window.switchHealthSubTab('appointments')"
+                        style="border: none; background: #1e293b; color: #ffffff; font-weight: 700; font-size: 0.85rem; padding: 9px 18px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-calendar-check"></i> Appointment Requests
+                        <span id="healthSubTabCountAppointments" style="display: none; background: #ef4444; color: #ffffff; font-size: 0.72rem; font-weight: 800; border-radius: 999px; padding: 1px 8px;">0</span>
+                    </button>
+                    <button type="button" id="healthSubTabBtnPriority" onclick="window.switchHealthSubTab('priority')"
+                        style="border: none; background: transparent; color: #475569; font-weight: 700; font-size: 0.85rem; padding: 9px 18px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-heart-pulse"></i> Illness &amp; Priority
+                        <span id="healthSubTabCountPriority" style="display: none; background: #ef4444; color: #ffffff; font-size: 0.72rem; font-weight: 800; border-radius: 999px; padding: 1px 8px;">0</span>
+                    </button>
+                </div>
+
+                <!-- SUB-TAB: Senior Appointment Requests (Booked by Seniors — Approve / Decline) -->
+                <div id="healthSubAppointments">
+                <div style="background: #fafafa; border-radius: 6px; padding: 30px; border: 1px solid #d4d4d8;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; flex-wrap: wrap; gap: 15px; border-bottom: 2px solid #1e293b; padding-bottom: 15px;">
+                        <div>
+                            <h3 style="margin: 0; color: #1e293b; font-size: 1.15rem;">Senior Appointment Requests</h3>
+                            <p style="margin: 4px 0 0; color: #52525b; font-size: 0.85rem;">All checkup appointments booked by seniors through the online booking system &mdash; approve or decline each request, then mark approved visits as done</p>
+                        </div>
+                        <span id="seniorApptPendingCount" style="display: none; background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; padding: 6px 14px; border-radius: 20px; font-weight: 700; font-size: 0.8rem;"></span>
+                    </div>
+
+                    <!-- Senior Appointment Requests List Container -->
+                    <div id="seniorApptRequestsContainer" style="display: flex; flex-direction: column; gap: 12px; max-height: 480px; overflow-y: auto; padding-right: 5px;">
+                        <div style="text-align: center; color: #71717a; padding: 30px;">
+                            Loading appointment requests...
                         </div>
                     </div>
-                    <div>
-                        <h4 style="margin-bottom: 15px; color: #1e293b;">Recent Updates</h4>
-                        <div class="health-update-box">
-                            <h4>12 health records updated today</h4>
-                            <p onclick="window.openHealthUpdatesModal()" style="cursor:pointer; color:#3b82f6; font-weight:600;">View Updates &rarr;</p>
+                </div>
+                </div>
+
+                <!-- SUB-TAB: Senior Illness & Priority Management (staff decision) -->
+                <div id="healthSubPriority" style="display: none;">
+                <div id="seniorHealthMgmtSection" style="background: #fafafa; border-radius: 6px; padding: 30px; border: 1px solid #d4d4d8;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; flex-wrap: wrap; gap: 15px; border-bottom: 2px solid #1e293b; padding-bottom: 15px;">
+                        <div>
+                            <h3 style="margin: 0; color: #1e293b; font-size: 1.15rem;">Senior Illness &amp; Priority Management</h3>
+                            <p style="margin: 4px 0 0; color: #52525b; font-size: 0.85rem;">Review each verified senior's uploaded <strong>medical certification</strong>, then set their official health condition and priority level &mdash; <strong>Low</strong>, <strong>Medium</strong> or <strong>High</strong>. Verified senior accounts only.</p>
+                        </div>
+                        <span id="healthCertPendingBadge" style="display: none; background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; padding: 6px 14px; border-radius: 20px; font-weight: 700; font-size: 0.8rem;"></span>
+                    </div>
+
+                    <!-- Filters + search -->
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 16px;">
+                        <button type="button" class="health-filter-chip active" data-health-filter="all" style="border:1px solid #cbd5e1; background:#ffffff; color:#334155; font-weight:700; font-size:0.78rem; padding:7px 14px; border-radius:20px; cursor:pointer;">All Verified Seniors</button>
+                        <button type="button" class="health-filter-chip" data-health-filter="pending" style="border:1px solid #cbd5e1; background:#ffffff; color:#334155; font-weight:700; font-size:0.78rem; padding:7px 14px; border-radius:20px; cursor:pointer;">Pending Certification</button>
+                        <button type="button" class="health-filter-chip" data-health-filter="illness" style="border:1px solid #cbd5e1; background:#ffffff; color:#334155; font-weight:700; font-size:0.78rem; padding:7px 14px; border-radius:20px; cursor:pointer;">With Illness</button>
+                        <button type="button" class="health-filter-chip" data-health-filter="high" style="border:1px solid #cbd5e1; background:#ffffff; color:#334155; font-weight:700; font-size:0.78rem; padding:7px 14px; border-radius:20px; cursor:pointer;">High Priority</button>
+                        <input type="text" id="healthSearchInput" placeholder="Search senior name, OSCA Sr. ID or illness..." style="flex:1; min-width:220px; padding:8px 12px; border:1px solid #cbd5e1; border-radius:8px; font-size:0.85rem; box-sizing:border-box; background:white;">
+                    </div>
+
+                    <div id="seniorHealthListContainer" style="display: flex; flex-direction: column; gap: 12px; max-height: 560px; overflow-y: auto; padding-right: 5px;">
+                        <div style="text-align: center; color: #71717a; padding: 30px;">
+                            Loading senior health records...
                         </div>
                     </div>
+                </div>
                 </div>
 
             </div>
+        </div>
+
+        <!-- TAB 4.5: ARCHIVE (Archive Function) -->
+        <div id="tab-archive" class="tab-content" style="display: none;">
+
+            <!-- Archive Function banner -->
+            <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; padding: 18px 24px; margin-bottom: 25px; display: flex; gap: 14px; align-items: flex-start;">
+                <i class="fas fa-box-archive" style="font-size: 1.3rem; color: #d97706; margin-top: 3px;"></i>
+                <div>
+                    <h3 style="margin: 0 0 4px; color: #92400e; font-size: 1.05rem;">Archive Function</h3>
+                    <p style="margin: 0; color: #a16207; font-size: 0.85rem; line-height: 1.5;">
+                        Records marked <strong>Inactive, Deceased, or Transferred</strong> are moved to this archive so that only
+                        <strong>ACTIVE</strong> senior citizens appear in the main dashboard and processing lists. Archived records remain
+                        fully recoverable, duplicate and fragmented records are eliminated through the integrity scan, and an
+                        automatic daily backup with a data recovery plan protects all records.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Archived summary chips -->
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 25px;">
+                <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px 20px; text-align: center;">
+                    <h3 id="archTotalCount" style="margin: 0; color: #92400e; font-size: 1.6rem;">0</h3>
+                    <p style="margin: 2px 0 0; color: #64748b; font-size: 0.8rem; font-weight: 600;">Total Archived</p>
+                </div>
+                <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px 20px; text-align: center;">
+                    <h3 id="archInactiveCount" style="margin: 0; color: #991b1b; font-size: 1.6rem;">0</h3>
+                    <p style="margin: 2px 0 0; color: #64748b; font-size: 0.8rem; font-weight: 600;">Inactive</p>
+                </div>
+                <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px 20px; text-align: center;">
+                    <h3 id="archDeceasedCount" style="margin: 0; color: #1e293b; font-size: 1.6rem;">0</h3>
+                    <p style="margin: 2px 0 0; color: #64748b; font-size: 0.8rem; font-weight: 600;">Deceased</p>
+                </div>
+                <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px 20px; text-align: center;">
+                    <h3 id="archTransferredCount" style="margin: 0; color: #92400e; font-size: 1.6rem;">0</h3>
+                    <p style="margin: 2px 0 0; color: #64748b; font-size: 0.8rem; font-weight: 600;">Transferred</p>
+                </div>
+            </div>
+
+            <!-- Archived records list -->
+            <div style="background: white; padding: 30px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.02); margin-bottom: 25px; border: 1px solid #e2e8f0;">
+                <div style="display: flex; justify-content: space-between; align-items: center; gap: 15px; flex-wrap: wrap; margin-bottom: 5px;">
+                    <h3 style="margin: 0; color: #1e293b; font-size: 1.1rem; border-bottom: 2px solid #1e293b; padding-bottom: 10px;">
+                        Archived Senior Citizen Records
+                    </h3>
+                    <div style="position: relative; min-width: 260px; flex: 1; max-width: 380px;">
+                        <i class="fas fa-search" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #94a3b8; font-size: 0.85rem;"></i>
+                        <input type="text" id="archiveSearchInput" placeholder="Search name, OSCA ID, email, or status..." oninput="renderArchiveList()"
+                            style="width: 100%; padding: 10px 14px 10px 34px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.88rem; font-family: 'Inter', sans-serif; outline: none;" />
+                    </div>
+                </div>
+                <p style="color: #64748b; font-size: 0.82rem; margin: 8px 0 18px;">
+                    These records are excluded from the main dashboard and all processing lists. Use <strong>Restore to Active</strong> to return a record to the active roster.
+                </p>
+                <div id="archiveListContainer">
+                    <div style="text-align: center; color: #64748b; padding: 20px;">Loading archived records...</div>
+                </div>
+            </div>
+
+            <!-- Face-Scan Reactivation Requests (staff = final human decision) -->
+            <div style="background: white; padding: 30px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.02); margin-bottom: 25px; border: 1px solid #a7f3d0;">
+                <div style="display: flex; justify-content: space-between; align-items: center; gap: 15px; flex-wrap: wrap; margin-bottom: 5px;">
+                    <h3 style="margin: 0; color: #065f46; font-size: 1.1rem; border-bottom: 2px solid #059669; padding-bottom: 10px;">
+                        <i class="fas fa-face-smile" style="margin-right: 8px;"></i>Face-Scan Reactivation Requests
+                        <span id="reactivationPendingBadge" style="display: none; background: #059669; color: white; font-size: 0.72rem; border-radius: 999px; padding: 2px 10px; margin-left: 8px; vertical-align: middle;">0 pending</span>
+                    </h3>
+                    <button onclick="window.loadReactivationRequests && window.loadReactivationRequests()"
+                        style="background: white; color: #065f46; border: 1px solid #059669; padding: 9px 18px; border-radius: 8px; font-weight: 700; font-size: 0.84rem; cursor: pointer;">
+                        <i class="fas fa-rotate" style="margin-right: 6px;"></i>Refresh
+                    </button>
+                </div>
+                <p style="color: #64748b; font-size: 0.82rem; margin: 8px 0 18px;">
+                    Seniors whose accounts are <strong>Inactive</strong> can reactivate themselves with an email code + face scan.
+                    Compare the <strong>live photo</strong> with the <strong>registration photo</strong>, then Approve or Decline.
+                    Approval reactivates the account immediately.
+                </p>
+                <div id="reactivationListContainer">
+                    <div style="text-align: center; color: #64748b; padding: 20px;">Loading reactivation requests...</div>
+                </div>
+            </div>
+
+            <!-- Data Integrity panel -->
+            <div style="background: white; padding: 26px; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 2px 10px rgba(0,0,0,0.02); margin-bottom: 25px;">
+                <h4 style="margin: 0 0 4px; color: #1e293b; font-size: 1rem; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+                    <i class="fas fa-clipboard-check" style="color: #2563eb;"></i> Elimination of Duplicate &amp; Fragmented Records
+                </h4>
+                <p style="color: #64748b; font-size: 0.82rem; margin: 0 0 14px;">
+                    Scans every senior record for duplicates (same OSCA Senior ID, same name + birthdate, or same email) and for
+                    fragmented/incomplete records, so each senior citizen keeps exactly one clean record.
+                </p>
+                <button onclick="runIntegrityScan()" id="runIntegrityScanBtn"
+                    style="background: #2563eb; color: white; border: none; padding: 10px 22px; border-radius: 8px; font-weight: 700; font-size: 0.85rem; cursor: pointer; margin-bottom: 16px;">
+                    <i class="fas fa-magnifying-glass" style="margin-right: 6px;"></i>Run Integrity Scan
+                </button>
+                <div id="integrityResultsContainer">
+                    <div style="text-align: center; color: #94a3b8; padding: 16px; border: 1px dashed #d4d4d8; border-radius: 8px; font-size: 0.85rem;">
+                        Run a scan to detect duplicate and fragmented records.
+                    </div>
+                </div>
+            </div>
+
         </div>
 
         <!-- TAB 5: NOTIFICATIONS -->
         <div id="tab-notifications" class="tab-content" style="display: none;">
-            <div style="background: white; padding: 40px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.02);">
-                
-                <div style="display: flex; align-items: center; gap: 20px; margin-bottom: 40px;">
-                    <div style="width: 70px; height: 70px; background: #f3e8ff; border-radius: 12px; display: flex; justify-content: center; align-items: center; font-size: 2rem; color: #a855f7;">
-                        <i class="fas fa-bell"></i>
+            <div style="background: white; padding: 36px; border-radius: 16px; box-shadow: 0 4px 25px rgba(0,0,0,0.04); border: 1px solid #f1f5f9;">
+
+                <!-- Header -->
+                <div class="emp-notif-head">
+                    <div class="enh-left">
+                        <div class="enh-icon"><i class="fas fa-bell"></i></div>
+                        <div>
+                            <h3>Notifications</h3>
+                            <p>Live system activity &mdash; registrations, appointments and claims</p>
+                        </div>
                     </div>
-                    <div>
-                        <h3 style="margin: 0; color: #1e293b; font-size: 1.2rem;">Notifications</h3>
-                        <p style="margin: 5px 0 0; color: #64748b;">Approve payouts and remind seniors</p>
+                    <div class="enh-right">
+                        <span id="empNotifUnreadCount" class="notif-unread-pill" style="display:none;">0 unread</span>
+                        <button id="empNotifMarkAllBtn" class="notif-markall-btn" style="display:none;" onclick="window.markAllEmpNotificationsRead()">
+                            <i class="fas fa-check-double"></i> Mark all as read
+                        </button>
                     </div>
                 </div>
 
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px;">
-                    <!-- Left Column -->
-                    <div class="payout-container">
-                        <h3 style="text-align: center; color: #166534; margin-bottom: 20px; font-size: 1.1rem;">Requests Payout</h3>
-                        <div id="payoutListContainer">
-                            <div style="text-align: center; color: #166534; padding: 20px;">Loading payout requests...</div>
-                        </div>
-                        <div id="claimsPayoutContainer" style="margin-top: 15px; border-top: 1px dashed #bbf7d0; padding-top: 15px;"></div>
-                    </div>
+                <!-- Filter chips -->
+                <div class="notif-filters" id="empNotifFilters">
+                    <button class="notif-chip active" data-filter="all" onclick="window.setEmpNotifFilter('all')">All</button>
+                    <button class="notif-chip" data-filter="verify" onclick="window.setEmpNotifFilter('verify')"><i class="fas fa-user-plus"></i> Verifications</button>
+                    <button class="notif-chip" data-filter="appt" onclick="window.setEmpNotifFilter('appt')"><i class="fas fa-calendar-check"></i> Appointments</button>
+                    <button class="notif-chip" data-filter="claim" onclick="window.setEmpNotifFilter('claim')"><i class="fas fa-hand-holding-heart"></i> Claims</button>
+                </div>
 
-                    <!-- Right Column -->
-                    <div class="reminder-box">
-                        <h3 style="text-align: center; color: #1e293b; margin-bottom: 20px; font-size: 1.1rem;">Send Reminders</h3>
-                        <textarea id="reminderMessage" placeholder="Write a message/reminders..."></textarea>
-                        <div style="display: flex; justify-content: center; gap: 15px;">
-                            <button class="btn" onclick="window.sendReminderToAll()" style="background: #8b5cf6; color: white; padding: 10px 25px; border-radius: 6px;">Send to everyone</button>
-                            <button class="btn" onclick="window.openSelectUserModal()" style="background: #ef4444; color: white; padding: 10px 25px; border-radius: 6px;">Select a user</button>
+                <!-- Live notification feed -->
+                <div id="notifFeedContainer" class="notif-feed">
+                    <div style="text-align:center;color:#94a3b8;padding:40px 20px;">Loading notifications...</div>
+                </div>
+
+                <!-- Send Reminder composer (redesigned) -->
+                <div class="reminder-composer">
+                    <div class="rc-head">
+                        <div class="rc-icon"><i class="fas fa-paper-plane"></i></div>
+                        <div>
+                            <h4>Send a Reminder</h4>
+                            <p>Delivers instantly to the seniors&rsquo; notification inbox</p>
+                        </div>
+                    </div>
+                    <textarea id="reminderMessage" maxlength="300" placeholder="Write a reminder message for seniors... e.g. &quot;Payout distribution is on Friday. Bring your QR Digital ID.&quot;"></textarea>
+                    <div class="rc-quick">
+                        <span>Quick templates:</span>
+                        <button type="button" onclick="window.useReminderTemplate(0)">Payout schedule</button>
+                        <button type="button" onclick="window.useReminderTemplate(1)">Documents to bring</button>
+                        <button type="button" onclick="window.useReminderTemplate(2)">Health visit</button>
+                    </div>
+                    <div class="rc-foot">
+                        <span id="reminderCharCount" class="rc-count">0 / 300</span>
+                        <div class="rc-actions">
+                            <button class="btn-rc-secondary" onclick="window.openSelectUserModal()"><i class="fas fa-users"></i> Select seniors&hellip;</button>
+                            <button class="btn-rc-primary" onclick="window.sendReminderToAll()"><i class="fas fa-paper-plane"></i> Send to everyone</button>
                         </div>
                     </div>
                 </div>
@@ -643,7 +1344,7 @@
             </div>
         </div>
 
-    </div>
+
 
     <!-- Claim View Details Modal -->
     <div id="claimDetailsModal" style="display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.6); backdrop-filter: blur(4px); z-index: 9999; justify-content: center; align-items: center; padding: 20px;">
@@ -658,92 +1359,11 @@
             </div>
             
             <div style="display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #f1f5f9; padding-top: 15px; margin-top: 10px;">
-                <button id="modalApproveBtn" class="btn" style="background: #22c55e; color: white; border-radius: 6px; padding: 10px 20px; font-weight: 600; cursor: pointer; border: none;">Approve Claim</button>
-                <button id="modalRejectBtn" class="btn" style="background: #ef4444; color: white; border-radius: 6px; padding: 10px 20px; font-weight: 600; cursor: pointer; border: none;">Decline Claim</button>
+                <button id="modalApproveBtn" class="btn" style="background: #22c55e; color: white; border-radius: 6px; padding: 10px 20px; font-weight: 600; cursor: pointer; border: none;">Accept Claim</button>
+                <button id="modalRejectBtn" class="btn" style="background: #ef4444; color: white; border-radius: 6px; padding: 10px 20px; font-weight: 600; cursor: pointer; border: none;">Reject Claim</button>
             </div>
         </div>
-    </div>
-
-    <!-- Health Alerts Modal -->
-    <div id="healthAlertsModal" style="display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.6); backdrop-filter: blur(4px); z-index: 9999; justify-content: center; align-items: center; padding: 20px;">
-        <div style="background: white; border-radius: 16px; width: 100%; max-width: 500px; padding: 30px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; display: flex; flex-direction: column; gap: 20px; animation: fadeIn 0.2s ease-out;">
-            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #fee2e2; padding-bottom: 15px;">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <div style="width: 40px; height: 40px; background: #fee2e2; border-radius: 50%; display: flex; justify-content: center; align-items: center; color: #ef4444; font-size: 1.1rem;">
-                        <i class="fas fa-exclamation-circle"></i>
-                    </div>
-                    <h3 style="color: #1e293b; font-size: 1.2rem; font-weight: 700; margin: 0;">Critical Health Alerts</h3>
-                </div>
-                <span onclick="document.getElementById('healthAlertsModal').style.display='none'" style="font-size: 1.8rem; color: #94a3b8; cursor: pointer; font-weight: bold; line-height: 1;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#94a3b8'">&times;</span>
-            </div>
-            
-            <div style="display: flex; flex-direction: column; gap: 15px; max-height: 400px; overflow-y: auto;">
-                <div style="border: 1px solid #e2e8f0; border-radius: 12px; padding: 15px; background: #f8fafc; border-left: 4px solid #ef4444;">
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
-                        <h4 style="color: #1e293b; font-size: 1.05rem; font-weight: 700; margin: 0;">Juan Dela Cruz</h4>
-                        <span style="background: #fee2e2; color: #b91c1c; padding: 3px 8px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;">High BP</span>
-                    </div>
-                    <p style="color: #475569; font-size: 0.9rem; margin: 0 0 10px 0;">Blood pressure logged at 160/95. Requires immediate follow-up.</p>
-                    <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: #64748b;">
-                        <span>Age: 72</span>
-                        <button onclick="document.getElementById('healthAlertsModal').style.display='none'; switchEmpTab('notifications', document.querySelectorAll('.emp-nav-pill')[4]); setTimeout(() => window.selectUserReminder('Juan Dela Cruz'), 500);" style="background:none; border:none; color:#3b82f6; cursor:pointer; font-weight:bold;">Contact &rarr;</button>
-                    </div>
-                </div>
-
-                <div style="border: 1px solid #e2e8f0; border-radius: 12px; padding: 15px; background: #f8fafc; border-left: 4px solid #ef4444;">
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
-                        <h4 style="color: #1e293b; font-size: 1.05rem; font-weight: 700; margin: 0;">Maria Santos</h4>
-                        <span style="background: #fee2e2; color: #b91c1c; padding: 3px 8px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;">Missed Meds</span>
-                    </div>
-                    <p style="color: #475569; font-size: 0.9rem; margin: 0 0 10px 0;">Has not collected maintenance medication for 2 months.</p>
-                    <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: #64748b;">
-                        <span>Age: 68</span>
-                        <button onclick="document.getElementById('healthAlertsModal').style.display='none'; switchEmpTab('notifications', document.querySelectorAll('.emp-nav-pill')[4]); setTimeout(() => window.selectUserReminder('Maria Santos'), 500);" style="background:none; border:none; color:#3b82f6; cursor:pointer; font-weight:bold;">Contact &rarr;</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Health Updates Modal -->
-    <div id="healthUpdatesModal" style="display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.6); backdrop-filter: blur(4px); z-index: 9999; justify-content: center; align-items: center; padding: 20px;">
-        <div style="background: white; border-radius: 16px; width: 100%; max-width: 500px; padding: 30px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; display: flex; flex-direction: column; gap: 20px; animation: fadeIn 0.2s ease-out;">
-            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eff6ff; padding-bottom: 15px;">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <div style="width: 40px; height: 40px; background: #eff6ff; border-radius: 50%; display: flex; justify-content: center; align-items: center; color: #3b82f6; font-size: 1.1rem;">
-                        <i class="fas fa-clipboard-list"></i>
-                    </div>
-                    <h3 style="color: #1e293b; font-size: 1.2rem; font-weight: 700; margin: 0;">Recent Health Updates</h3>
-                </div>
-                <span onclick="document.getElementById('healthUpdatesModal').style.display='none'" style="font-size: 1.8rem; color: #94a3b8; cursor: pointer; font-weight: bold; line-height: 1;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#94a3b8'">&times;</span>
-            </div>
-            
-            <div style="display: flex; flex-direction: column; gap: 15px; max-height: 400px; overflow-y: auto;">
-                <div style="border: 1px solid #e2e8f0; border-radius: 12px; padding: 15px; background: #f8fafc; border-left: 4px solid #3b82f6;">
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
-                        <h4 style="color: #1e293b; font-size: 1.05rem; font-weight: 700; margin: 0;">Pedro Reyes</h4>
-                        <span style="color: #64748b; font-size: 0.8rem;">Today, 10:30 AM</span>
-                    </div>
-                    <p style="color: #475569; font-size: 0.9rem; margin: 0;">Completed monthly checkup. Vitals normal.</p>
-                </div>
-                <div style="border: 1px solid #e2e8f0; border-radius: 12px; padding: 15px; background: #f8fafc; border-left: 4px solid #3b82f6;">
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
-                        <h4 style="color: #1e293b; font-size: 1.05rem; font-weight: 700; margin: 0;">Elena Cruz</h4>
-                        <span style="color: #64748b; font-size: 0.8rem;">Today, 09:15 AM</span>
-                    </div>
-                    <p style="color: #475569; font-size: 0.9rem; margin: 0;">Prescription refill processed successfully.</p>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <script>
-        window.openHealthAlertsModal = function() {
-            document.getElementById('healthAlertsModal').style.display = 'flex';
-        };
-        window.openHealthUpdatesModal = function() {
-            document.getElementById('healthUpdatesModal').style.display = 'flex';
-        };
+    </div>    <script>
         window.openSelectUserModal = function() {
             // Check if there is a message first
             const msg = document.getElementById('reminderMessage').value.trim();
@@ -759,13 +1379,8 @@
     <!-- Select User Modal -->
     <div id="selectUserModal" style="display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.6); backdrop-filter: blur(4px); z-index: 9999; justify-content: center; align-items: center; padding: 20px;">
         <div style="background: white; border-radius: 16px; width: 100%; max-width: 500px; padding: 30px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; display: flex; flex-direction: column; gap: 20px; animation: fadeIn 0.2s ease-out;">
-            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #f1f5f9; padding-bottom: 15px;">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <div style="width: 40px; height: 40px; background: #fee2e2; border-radius: 50%; display: flex; justify-content: center; align-items: center; color: #ef4444; font-size: 1.1rem;">
-                        <i class="fas fa-users"></i>
-                    </div>
-                    <h3 style="color: #1e293b; font-size: 1.2rem; font-weight: 700; margin: 0;">Select Seniors to Remind</h3>
-                </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #1e293b; padding-bottom: 15px;">
+                <h3 style="color: #1e293b; font-size: 1.2rem; font-weight: 700; margin: 0;">Select Seniors to Remind</h3>
                 <span onclick="document.getElementById('selectUserModal').style.display='none'" style="font-size: 1.8rem; color: #94a3b8; cursor: pointer; font-weight: bold; line-height: 1;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#94a3b8'">&times;</span>
             </div>
             
@@ -782,11 +1397,174 @@
             </div>
         </div>
     </div>
+
+    <!-- Senior Accounts List Modal (dashboard charts) -->
+    <div id="seniorListModal" style="display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.6); backdrop-filter: blur(4px); z-index: 9999; justify-content: center; align-items: center; padding: 20px;">
+        <div style="background: white; border-radius: 6px; width: 100%; max-width: 940px; max-height: 85vh; padding: 24px 28px; border: 1px solid #d4d4d8; display: flex; flex-direction: column;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #1e293b; padding-bottom: 12px; margin-bottom: 14px;">
+                <div>
+                    <h3 id="seniorListTitle" style="margin: 0; color: #1e293b; font-size: 1.15rem; font-weight: 700;">All Senior Accounts</h3>
+                    <p id="seniorListSub" style="margin: 4px 0 0; color: #52525b; font-size: 0.85rem;"></p>
+                </div>
+                <span onclick="document.getElementById('seniorListModal').style.display='none'" style="font-size: 1.8rem; color: #94a3b8; cursor: pointer; font-weight: bold; line-height: 1;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#94a3b8'">&times;</span>
+            </div>
+            <div id="seniorListContent" style="overflow-y: auto;"></div>
+        </div>
+    </div>
+
+    <!-- Senior Profile Modal (Seniors by Priority Level section) -->
+    <div id="prioritySeniorModal" style="display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.6); backdrop-filter: blur(4px); z-index: 9999; justify-content: center; align-items: center; padding: 20px;">
+        <div style="background: white; border-radius: 14px; width: 100%; max-width: 980px; max-height: 88vh; border: 1px solid #e2e8f0; display: flex; flex-direction: column; overflow: hidden;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; padding: 20px 24px; border-bottom: 2px solid #1e293b; flex-wrap: wrap; background:#f8fafc;">
+                <div style="min-width:0;">
+                    <h3 id="prioritySeniorTitle" style="margin: 0; color: #1e293b; font-size: 1.15rem; font-weight: 700;">Senior Profile</h3>
+                    <p id="prioritySeniorSub" style="margin: 4px 0 0; color: #64748b; font-size: 0.85rem;"></p>
+                </div>
+                <span onclick="window.closePrioritySeniorModal()" style="font-size: 1.8rem; color: #94a3b8; cursor: pointer; font-weight: bold; line-height: 1;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#94a3b8'">&times;</span>
+            </div>
+            <div id="prioritySeniorContent" style="overflow-y: auto; padding: 20px 24px;"></div>
+        </div>
+    </div>
+
+    <!-- Employee Confirmation Modal -->
+    <div id="empConfirmModal" style="display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.6); backdrop-filter: blur(4px); z-index: 99999; justify-content: center; align-items: center; padding: 20px;">
+        <div style="background: white; border-radius: 16px; width: 100%; max-width: 420px; padding: 28px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2); border: 1px solid #e2e8f0; text-align: center;">
+            <h3 style="color: #1e293b; font-size: 1.25rem; font-weight: 700; margin: 0 0 10px;">Are you sure?</h3>
+            <p id="empConfirmMessage" style="color: #64748b; font-size: 0.95rem; line-height: 1.5; margin: 0 0 24px;">Do you want to proceed with this action?</p>
+            <div style="display: flex; gap: 12px; justify-content: center;">
+                <button id="empConfirmNoBtn" style="padding: 10px 24px; border: 1px solid #cbd5e1; border-radius: 8px; background: white; color: #475569; font-weight: 600; cursor: pointer;">No</button>
+                <button id="empConfirmYesBtn" style="padding: 10px 26px; border: none; border-radius: 8px; background: #2563eb; color: white; font-weight: 700; cursor: pointer; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);">Yes</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Health Report Review Modal — illness assessment + priority level (OSCA staff) -->
+    <div id="healthReviewModal" style="display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.65); backdrop-filter: blur(4px); z-index: 99998; justify-content: center; align-items: center; padding: 18px;">
+        <div style="background: white; border-radius: 10px; width: 100%; max-width: 1100px; max-height: 92vh; border: 1px solid #cbd5e1; display: flex; flex-direction: column; overflow: hidden;">
+
+            <!-- Header -->
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; padding: 18px 24px; border-bottom: 2px solid #1e293b; flex-wrap: wrap;">
+                <div style="min-width: 0;">
+                    <h3 style="margin: 0; color: #1e293b; font-size: 1.1rem; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-notes-medical" style="color: #2563eb;"></i> <span id="healthReviewSeniorName">Senior</span>
+                    </h3>
+                    <p id="healthReviewSeniorMeta" style="margin: 5px 0 0; color: #52525b; font-size: 0.82rem;"></p>
+                </div>
+                <span onclick="window.closeHealthReviewModal()" style="font-size: 1.8rem; color: #94a3b8; cursor: pointer; font-weight: bold; line-height: 1;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#94a3b8'">&times;</span>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0; overflow-y: auto; flex: 1;">
+
+                <!-- LEFT: submitted report + certification -->
+                <div style="padding: 20px 24px; border-right: 1px solid #e2e8f0; background: #fafafa;">
+                    <h4 style="margin: 0 0 12px; font-size: 0.9rem; font-weight: 700; color: #1e293b; display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-file-medical" style="color: #0ea5e9;"></i> Uploaded Medical Certification
+                    </h4>
+
+                    <div id="healthReviewReportBox" style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; margin-bottom: 14px; font-size: 0.84rem; color: #334155; line-height: 1.6;"></div>
+
+                    <div id="healthReviewCertWrap" style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; min-height: 220px; display: flex; align-items: center; justify-content: center; overflow: hidden; padding: 8px;">
+                        <div style="text-align: center; color: #94a3b8; font-size: 0.85rem; padding: 24px;">
+                            <i class="fas fa-file-circle-question" style="font-size: 1.6rem; display: block; margin-bottom: 8px;"></i>
+                            No certification attached to this update.
+                        </div>
+                    </div>
+
+                    <div id="healthReviewCertActions" style="display: none; gap: 8px; margin-top: 12px; flex-wrap: wrap;">
+                        <button type="button" onclick="window.openHealthCertification()" style="border: 1px solid #2563eb; background: #eff6ff; color: #1d4ed8; font-size: 0.8rem; font-weight: 700; padding: 9px 16px; border-radius: 8px; cursor: pointer;">
+                            <i class="fas fa-arrow-up-right-from-square" style="margin-right: 6px;"></i>Open Full Certification
+                        </button>
+                        <span id="healthReviewLinkNote" style="font-size: 0.72rem; color: #94a3b8; align-self: center;"></span>
+                    </div>
+                </div>
+
+                <!-- RIGHT: staff illness assessment + priority decision -->
+                <div style="padding: 20px 24px;">
+                    <h4 style="margin: 0 0 12px; font-size: 0.9rem; font-weight: 700; color: #1e293b; display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-user-nurse" style="color: #059669;"></i> Illness Assessment &amp; Priority Level
+                    </h4>
+
+                    <!-- Auto-suggestion banner (human decision remains final) -->
+                    <div id="healthPrioritySuggestion" style="background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 11px 14px; margin-bottom: 14px; font-size: 0.8rem; color: #075985; line-height: 1.55;"></div>
+
+                    <!-- Official health condition -->
+                    <label style="display: block; font-size: 0.75rem; font-weight: 700; color: #475569; margin-bottom: 5px;">Official Health Condition / Illness <span style="color: #dc2626;">*</span></label>
+                    <input type="text" id="healthReviewCondition" list="healthReviewConditionList" maxlength="160" placeholder="e.g. Hypertension, Diabetes, Arthritis" style="width: 100%; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.88rem; box-sizing: border-box; margin-bottom: 14px; background: white;">
+                    <datalist id="healthReviewConditionList">
+                        <option value="Hypertension"></option>
+                        <option value="Diabetes"></option>
+                        <option value="Arthritis"></option>
+                        <option value="Asthma"></option>
+                        <option value="Heart disease"></option>
+                        <option value="Stroke"></option>
+                        <option value="Kidney failure / Dialysis"></option>
+                        <option value="Cancer"></option>
+                        <option value="Dementia / Alzheimer's"></option>
+                        <option value="Bedridden"></option>
+                        <option value="None reported"></option>
+                    </datalist>
+
+                    <!-- Details -->
+                    <label style="display: block; font-size: 0.75rem; font-weight: 700; color: #475569; margin-bottom: 5px;">Illness Details <span style="font-weight: 400; color: #94a3b8;">(optional)</span></label>
+                    <textarea id="healthReviewDetails" rows="3" maxlength="1500" placeholder="Symptoms, medicines, duration, certification findings..." style="width: 100%; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.88rem; box-sizing: border-box; resize: vertical; font-family: inherit; margin-bottom: 16px; background: white;"></textarea>
+
+                    <!-- PRIORITY LEVEL -->
+                    <label style="display: block; font-size: 0.75rem; font-weight: 700; color: #475569; margin-bottom: 7px;">Priority Level <span style="color: #dc2626;">*</span></label>
+                    <div style="display: flex; gap: 10px; margin-bottom: 6px; flex-wrap: wrap;">
+                        <label class="health-priority-opt" data-priority="Low" style="flex: 1; min-width: 130px; cursor: pointer; border: 2px solid #cbd5e1; border-radius: 10px; padding: 11px 12px; background: #ffffff; display: flex; flex-direction: column; gap: 3px;">
+                            <span style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem; font-weight: 700; color: #15803d;">
+                                <input type="radio" name="healthPriorityRadio" value="Low" style="accent-color: #16a34a;"> Low Priority
+                            </span>
+                            <span style="font-size: 0.7rem; color: #64748b; line-height: 1.4;">Mild / controlled condition, still mobile and independent.</span>
+                        </label>
+                        <label class="health-priority-opt" data-priority="Medium" style="flex: 1; min-width: 130px; cursor: pointer; border: 2px solid #cbd5e1; border-radius: 10px; padding: 11px 12px; background: #ffffff; display: flex; flex-direction: column; gap: 3px;">
+                            <span style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem; font-weight: 700; color: #c2410c;">
+                                <input type="radio" name="healthPriorityRadio" value="Medium" style="accent-color: #ea580c;"> Medium Priority
+                            </span>
+                            <span style="font-size: 0.7rem; color: #64748b; line-height: 1.4;">Needs regular monitoring or ongoing medication.</span>
+                        </label>
+                        <label class="health-priority-opt" data-priority="High" style="flex: 1; min-width: 130px; cursor: pointer; border: 2px solid #cbd5e1; border-radius: 10px; padding: 11px 12px; background: #ffffff; display: flex; flex-direction: column; gap: 3px;">
+                            <span style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem; font-weight: 700; color: #b91c1c;">
+                                <input type="radio" name="healthPriorityRadio" value="High" style="accent-color: #dc2626;"> High Priority
+                            </span>
+                            <span style="font-size: 0.7rem; color: #64748b; line-height: 1.4;">Serious / urgent illness needing immediate attention.</span>
+                        </label>
+                    </div>
+                    <p style="margin: 0 0 16px; font-size: 0.72rem; color: #94a3b8;">The suggestion is only a guide &mdash; the priority level set here is your final staff decision.</p>
+
+                    <!-- Notes -->
+                    <label style="display: block; font-size: 0.75rem; font-weight: 700; color: #475569; margin-bottom: 5px;">Review Notes / Remarks <span style="font-weight: 400; color: #94a3b8;">(optional — shown to the senior)</span></label>
+                    <textarea id="healthReviewNotes" rows="2" maxlength="500" placeholder="e.g. Certification accepted. For monthly checkup follow-up." style="width: 100%; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.88rem; box-sizing: border-box; resize: vertical; font-family: inherit; background: white;"></textarea>
+
+                    <div id="healthReviewNotice" style="display: none; margin-top: 14px; border-radius: 8px; padding: 11px 14px; font-size: 0.82rem; line-height: 1.5;"></div>
+
+                    <!-- Footer actions -->
+                    <div style="display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #f1f5f9; padding-top: 15px; margin-top: 16px; flex-wrap: wrap;">
+                        <button type="button" onclick="window.closeHealthReviewModal()" style="border: 1px solid #cbd5e1; background: white; color: #475569; font-weight: 700; padding: 10px 18px; border-radius: 8px; cursor: pointer; font-size: 0.85rem;">Cancel</button>
+                        <button type="button" id="healthReviewRejectBtn" onclick="window.submitHealthReview('Rejected')" style="border: none; background: #ef4444; color: white; font-weight: 700; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 0.85rem;">
+                            <i class="fas fa-times-circle" style="margin-right: 6px;"></i>Reject Certification
+                        </button>
+                        <button type="button" id="healthReviewSaveBtn" onclick="window.submitHealthReview('Reviewed')" style="border: none; background: #059669; color: white; font-weight: 700; padding: 10px 22px; border-radius: 8px; cursor: pointer; font-size: 0.85rem; box-shadow: 0 4px 12px rgba(5,150,105,0.25);">
+                            <i class="fas fa-floppy-disk" style="margin-right: 6px;"></i>Save Health &amp; Set Priority
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="/js/notify.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script type="module" src="/js/main.js"></script>
     <script type="module" src="/js/employee.js"></script>
+    <script src="/js/process-benefits-board.js"></script>
     <script>
         function switchEmpTab(tabId, element) {
+            // Release the QR scanner camera when leaving the Verify tab
+            if (tabId !== 'verify' && window.qrScannerStop) {
+                window.qrScannerStop(false);
+            }
             document.querySelectorAll('.tab-content').forEach(tab => {
                 tab.style.display = 'none';
             });
@@ -802,10 +1580,21 @@
                 const badge = document.getElementById('empVerifyBadge');
                 if (badge) badge.style.display = 'none';
             }
-            if (tabId === 'notifications') {
-                const badge = document.getElementById('empNotifBadge');
+            if (tabId === 'process') {
+                const badge = document.getElementById('empProcessBadge');
                 if (badge) badge.style.display = 'none';
             }
+            if (tabId === 'health') {
+                const badge = document.getElementById('empHealthBadge');
+                if (badge) badge.style.display = 'none';
+            }
+            if (tabId === 'notifications' && window.renderEmployeeNotifications) {
+                window.renderEmployeeNotifications();
+            }
+            if (tabId === 'archive' && window.loadReactivationRequests) {
+                window.loadReactivationRequests();
+            }
+
         }
     </script>
 </body>

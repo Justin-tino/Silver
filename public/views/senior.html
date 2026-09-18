@@ -30,6 +30,8 @@
             background-color: #f1f5f9;
             color: var(--text-main);
             min-height: 100vh;
+            max-width: 100vw;
+            overflow-x: hidden; /* mobile safety net: never scroll sideways */
         }
 
         /* Layout Grid */
@@ -91,6 +93,29 @@
             background-color: rgba(255, 255, 255, 0.25);
             color: white;
             font-weight: 600;
+        }
+
+        /* ── Locked services (KYC not Verified / Pending) ── */
+        .sidebar-link.locked {
+            opacity: 0.55;
+            cursor: not-allowed;
+        }
+        .sidebar-link.locked:hover {
+            background-color: transparent;
+            color: rgba(255, 255, 255, 0.9);
+            padding-left: 16px;
+        }
+        .sidebar-link.locked::after {
+            content: "\f023";                       /* fa-lock */
+            font-family: "Font Awesome 6 Free";
+            font-weight: 900;
+            font-size: 0.75rem;
+            margin-left: auto;
+            background: rgba(239, 68, 68, 0.9);
+            color: #fff;
+            border-radius: 999px;
+            padding: 4px 7px;
+            flex-shrink: 0;
         }
 
         /* Main Window */
@@ -589,6 +614,239 @@
             color: #1e293b;
         }
 
+        /* ════════════════════════════════════════════
+           Benefits Showcase — Assistance + Monthly Pension + Lifetime Total
+           ════════════════════════════════════════════ */
+        .benefits-showcase-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            margin-bottom: 22px;
+        }
+        .benefits-summary-card {
+            background: white;
+            border-radius: 16px;
+            padding: 22px 20px;
+            border: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+        }
+        .benefits-summary-card .summary-icon {
+            width: 52px;
+            height: 52px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.35rem;
+            flex-shrink: 0;
+        }
+        .benefits-summary-card.card-pension .summary-icon { background: #dcfce7; color: #16a34a; }
+        .benefits-summary-card.card-assistance .summary-icon { background: #e0e7ff; color: #4f46e5; }
+        .benefits-summary-card.card-total {
+            background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+            color: white;
+            border: none;
+            box-shadow: 0 8px 20px rgba(30,41,59,0.18);
+        }
+        .benefits-summary-card.card-total .summary-icon {
+            background: rgba(255,255,255,0.15);
+            color: #fbbf24;
+            backdrop-filter: blur(6px);
+        }
+        .benefits-summary-card .summary-content {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            min-width: 0;
+            flex: 1;
+        }
+        .benefits-summary-card .summary-label {
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            color: var(--text-muted);
+        }
+        .benefits-summary-card.card-total .summary-label { color: rgba(255,255,255,0.72); }
+        .benefits-summary-card .summary-value {
+            font-size: 1.55rem;
+            font-weight: 800;
+            color: var(--text-main);
+            line-height: 1.1;
+            letter-spacing: -0.5px;
+        }
+        .benefits-summary-card.card-total .summary-value { color: white; font-size: 1.65rem; }
+        .benefits-summary-card .summary-sub {
+            font-size: 0.78rem;
+            color: #64748b;
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .benefits-summary-card.card-total .summary-sub { color: rgba(255,255,255,0.7); }
+        .benefits-summary-card .summary-badge {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            font-size: 0.68rem;
+            font-weight: 700;
+            padding: 4px 9px;
+            border-radius: 20px;
+            letter-spacing: 0.3px;
+        }
+        .badge-approved { background: #dcfce7; color: #166534; }
+        .badge-pending { background: #fef3c7; color: #92400e; }
+        .badge-none { background: #f1f5f9; color: #64748b; }
+        .card-total .summary-badge { background: rgba(251,191,36,0.18); color: #fde68a; border: 1px solid rgba(251,191,36,0.3); }
+
+        .benefits-history-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+        .benefits-history-card {
+            background: white;
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+            display: flex;
+            flex-direction: column;
+            min-height: 320px;
+        }
+        .history-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 20px;
+            border-bottom: 1px solid #f1f5f9;
+            background: #f8fafc;
+        }
+        .history-card-header h4 {
+            font-size: 0.92rem;
+            font-weight: 700;
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 0;
+        }
+        .history-card-header h4 i { color: #64748b; }
+        .history-count {
+            font-size: 0.7rem;
+            font-weight: 700;
+            padding: 4px 10px;
+            border-radius: 20px;
+            background: white;
+            border: 1px solid #e2e8f0;
+            color: #64748b;
+        }
+        .history-list {
+            flex: 1;
+            overflow-y: auto;
+            max-height: 420px;
+            display: flex;
+            flex-direction: column;
+        }
+        .history-entry {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 14px 20px;
+            border-bottom: 1px solid #f8fafc;
+            transition: background 0.15s;
+        }
+        .history-entry:last-child { border-bottom: none; }
+        .history-entry:hover { background: #f8fafc; }
+        .history-entry-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.95rem;
+            flex-shrink: 0;
+        }
+        .history-entry-icon.pension { background: #dcfce7; color: #16a34a; }
+        .history-entry-icon.assistance { background: #e0e7ff; color: #4f46e5; }
+        .history-entry-icon.burial { background: #fce7f3; color: #db2777; }
+        .history-entry-icon.bedridden { background: #ffedd5; color: #ea580c; }
+        .history-entry-main { flex: 1; min-width: 0; }
+        .history-entry-title {
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: var(--text-main);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .history-entry-meta {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 2px;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .history-entry-amount {
+            font-size: 0.95rem;
+            font-weight: 800;
+            color: #0f172a;
+            white-space: nowrap;
+        }
+        .history-entry-amount.pension-amt { color: #15803d; }
+        .history-status-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 4px;
+        }
+        .dot-approved { background: #22c55e; }
+        .dot-claimed { background: #3b82f6; }
+        .dot-pending { background: #f59e0b; }
+
+        .benefits-empty-state {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 36px 20px;
+            text-align: center;
+            color: #94a3b8;
+        }
+        .benefits-empty-state i {
+            font-size: 2rem;
+            margin-bottom: 10px;
+            opacity: 0.5;
+        }
+        .benefits-empty-state p {
+            font-size: 0.88rem;
+            font-weight: 600;
+            color: #64748b;
+            margin: 0 0 4px;
+        }
+        .benefits-empty-state span {
+            font-size: 0.75rem;
+            color: #94a3b8;
+        }
+
+        @media (max-width: 900px) {
+            .benefits-showcase-grid { grid-template-columns: 1fr; }
+            .benefits-history-grid { grid-template-columns: 1fr; }
+            .benefits-history-card { min-height: auto; }
+            .history-list { max-height: 340px; }
+        }
+
         /* Health Tab Content */
         .health-card {
             background: white;
@@ -751,6 +1009,83 @@
             border: 1px solid var(--border-color);
         }
 
+        /* Emergency Urgent Request toggle (Request only) */
+        .urgent-request-box {
+            border: 2px dashed #fca5a5;
+            background: #fff5f5;
+            border-radius: 14px;
+            padding: 18px 20px;
+            margin: 25px 0 15px;
+        }
+
+        .urgent-toggle {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .urgent-toggle input { display: none; }
+
+        .urgent-toggle-track {
+            width: 54px;
+            height: 28px;
+            background: #e2e8f0;
+            border-radius: 999px;
+            position: relative;
+            transition: background 0.25s ease;
+            flex-shrink: 0;
+        }
+
+        .urgent-toggle-thumb {
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            width: 22px;
+            height: 22px;
+            background: white;
+            border-radius: 50%;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            transition: transform 0.25s ease;
+        }
+
+        .urgent-toggle input:checked + .urgent-toggle-track { background: #dc2626; }
+        .urgent-toggle input:checked + .urgent-toggle-track .urgent-toggle-thumb { transform: translateX(26px); }
+
+        .urgent-toggle-text { display: flex; flex-direction: column; gap: 4px; }
+
+        .urgent-toggle-title {
+            font-weight: 800;
+            color: #b91c1c;
+            font-size: 1.02rem;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .urgent-toggle-tag {
+            background: #dc2626;
+            color: white;
+            font-size: 0.66rem;
+            font-weight: 800;
+            letter-spacing: 0.6px;
+            padding: 3px 9px;
+            border-radius: 999px;
+            text-transform: uppercase;
+            width: fit-content;
+        }
+
+        .urgent-honesty-note {
+            margin: 14px 0 0;
+            font-size: 0.86rem;
+            color: #7f1d1d;
+            line-height: 1.6;
+            background: #fee2e2;
+            border-radius: 10px;
+            padding: 12px 14px;
+        }
+
         .form-card-header {
             display: flex;
             justify-content: space-between;
@@ -815,49 +1150,100 @@
 
         .form-grid-3 {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 20px;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 16px 20px;
+            width: 100%;
+            box-sizing: border-box;
         }
 
         .form-grid-2 {
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 16px 20px;
+            width: 100%;
+            box-sizing: border-box;
         }
 
-        @media (max-width: 700px) {
-            .form-grid-3, .form-grid-2 {
-                grid-template-columns: 1fr;
+        @media (max-width: 860px) {
+            .form-grid-3 {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
             }
+        }
+
+        @media (max-width: 640px) {
+            .form-grid-3, .form-grid-2 {
+                grid-template-columns: 1fr !important;
+            }
+            /* Header: only logo, hamburger, MANUAL and LOGOUT fit on a phone */
+            .header-greeting, .header-divider { display: none !important; }
+            /* 16px inputs stop iOS Safari from auto-zooming into fields */
+            input, select, textarea { font-size: 16px !important; }
         }
 
         .form-group {
             display: flex;
             flex-direction: column;
             gap: 6px;
+            min-width: 0;
+            width: 100%;
+            box-sizing: border-box;
         }
 
         .form-group label {
-            font-size: 0.8rem;
+            font-size: 0.82rem;
             font-weight: 700;
             color: #475569;
+            line-height: 1.35;
+            word-break: break-word;
         }
 
         .form-group input, .form-group select, .form-group textarea {
-            padding: 12px 14px;
-            border: 1px solid #cbd5e1;
+            width: 100%;
+            max-width: 100%;
+            min-width: 0;
+            box-sizing: border-box;
+            padding: 10px 14px;
+            border: 1.5px solid #cbd5e1;
             border-radius: 8px;
             font-size: 0.95rem;
             color: var(--text-main);
             outline: none;
             background: #f8fafc;
             transition: all 0.2s ease;
+            height: 44px;
+        }
+
+        .form-group textarea {
+            height: auto;
+            min-height: 80px;
         }
 
         .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
             border-color: #3b82f6;
             background: white;
             box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        /* Milestone (Benefit Program) form inside the KYC card.
+           Its markup relies on the parent's vertical flow for spacing — in the
+           Service Form tab that parent is .interactive-form (flex + 25px gap).
+           #kycMilestoneSection provides the same flow so form-grid blocks and
+           labels never stack/crowd on top of each other. */
+        #kycMilestoneSection {
+            display: flex;
+            flex-direction: column;
+            gap: 22px;
+            width: 100%;
+            min-width: 0;
+            box-sizing: border-box;
+        }
+
+        #kycMilestoneSection .form-section-title {
+            margin-bottom: 0;
+        }
+
+        #kycMilestoneSection .form-group label {
+            line-height: 1.45;
         }
 
         .form-row-checkboxes {
@@ -995,13 +1381,15 @@
            ══════════════════════════════════════════════════════════════════ */
 
         .kyc-card {
-            max-width: 720px;
+            max-width: 880px;
+            width: 100%;
             margin: 0 auto;
             background: white;
             border-radius: 20px;
             padding: 40px;
-            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.03);
             border: 1px solid var(--border-color);
+            box-sizing: border-box;
         }
 
         /* Step Progress */
@@ -1100,15 +1488,20 @@
         /* Form Grid */
         .kyc-form-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
             gap: 18px;
             margin-bottom: 10px;
+            width: 100%;
+            box-sizing: border-box;
         }
 
         .kyc-field {
             display: flex;
             flex-direction: column;
             gap: 6px;
+            min-width: 0;
+            width: 100%;
+            box-sizing: border-box;
         }
 
         .kyc-label {
@@ -1117,6 +1510,8 @@
             color: #374151;
             text-transform: uppercase;
             letter-spacing: 0.3px;
+            line-height: 1.35;
+            word-break: break-word;
         }
 
         .kyc-required {
@@ -1131,7 +1526,11 @@
         }
 
         .kyc-input {
-            padding: 12px 14px;
+            width: 100%;
+            max-width: 100%;
+            min-width: 0;
+            box-sizing: border-box;
+            padding: 10px 14px;
             border: 1.5px solid #d1d5db;
             border-radius: 10px;
             font-size: 0.95rem;
@@ -1139,6 +1538,7 @@
             background: #fafafa;
             transition: all 0.2s ease;
             outline: none;
+            height: 44px;
         }
 
         .kyc-input:focus {
@@ -1290,6 +1690,30 @@
         }
 
         /* Scan Button */
+        .kyc-upload-zone { border: 2px dashed #93c5fd; border-radius: 14px; background: linear-gradient(180deg, #f8fbff, #eff6ff); padding: 20px 16px; display: flex; align-items: center; gap: 14px; cursor: pointer; transition: border-color 0.2s, box-shadow 0.2s; }
+        .kyc-upload-zone:hover { border-color: #2563eb; box-shadow: 0 6px 18px rgba(37,99,235,0.12); }
+        .kyc-upload-zone:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.15); }
+        .kyc-upload-zone.dragging { border-color: #16a34a; background: #f0fdf4; }
+        .kyc-upload-zone-icon { width: 52px; height: 52px; border-radius: 14px; background: linear-gradient(135deg, #2563eb, #1d4ed8); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; flex-shrink: 0; }
+        .kyc-upload-zone-body { flex: 1; min-width: 0; }
+        .kyc-upload-zone-title { font-size: 0.92rem; font-weight: 700; color: #1e293b; margin-bottom: 3px; }
+        .kyc-upload-zone-title span { font-weight: 500; color: #64748b; }
+        .kyc-upload-zone-sub { font-size: 0.76rem; color: #64748b; line-height: 1.5; }
+        .kyc-upload-zone-skip { font-size: 0.74rem; color: #15803d; margin-top: 5px; }
+        .kyc-upload-zone-btn { flex-shrink: 0; background: #0f172a; color: #fff; font-size: 0.78rem; font-weight: 700; padding: 9px 14px; border-radius: 9px; display: inline-flex; align-items: center; gap: 7px; }
+        .kyc-med-chip { display: flex; align-items: center; gap: 12px; background: #f0fdf4; border: 1.5px solid #bbf7d0; border-radius: 12px; padding: 10px 12px; margin-top: 12px; }
+        .kyc-med-chip-icon { width: 46px; height: 46px; border-radius: 10px; background: #dcfce7; color: #15803d; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; flex-shrink: 0; overflow: hidden; }
+        .kyc-med-chip-icon img, #kycMedCertImg { width: 100%; height: 100%; object-fit: cover; display: none; }
+        #kycMedCertImg.has-file { display: block; width: 46px; height: 46px; border-radius: 8px; flex-shrink: 0; }
+        .kyc-med-chip-meta { flex: 1; min-width: 0; }
+        .kyc-med-chip-name { font-size: 0.82rem; font-weight: 700; color: #166534; word-break: break-all; }
+        .kyc-med-chip-sub { font-size: 0.72rem; color: #4d7c0f; margin-top: 2px; }
+        #kycMedCertRemove { border: none; background: #fee2e2; color: #dc2626; font-size: 0.75rem; font-weight: 700; cursor: pointer; padding: 8px 12px; border-radius: 8px; flex-shrink: 0; }
+        .kyc-submit-btn { background: linear-gradient(135deg, #16a34a, #15803d); box-shadow: 0 8px 20px rgba(34,197,94,0.35); }
+        .kyc-submit-hint { text-align: center; font-size: 0.76rem; color: #64748b; margin: 10px 2px 0; line-height: 1.5; }
+        .kyc-review-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px 16px; margin: 14px 0; font-size: 0.84rem; color: #334155; line-height: 1.6; }
+        .kyc-review-box strong { color: #0f172a; }
+        .kyc-review-box .ok { color: #15803d; font-weight: 700; }
         .kyc-scan-btn {
             width: 100%;
             padding: 18px;
@@ -1352,6 +1776,26 @@
             color: var(--text-main);
         }
 
+        /* Senior ID Upload (Back-to-Back) — required for verification */
+        .kyc-id-upload-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin: 14px 0 8px; }
+        .kyc-id-upload-box { border:1.5px dashed #cbd5e1; border-radius:12px; background:#f8fafc; padding:14px; display:flex; flex-direction:column; gap:10px; position:relative; overflow:hidden; transition:border-color 0.2s, background 0.2s; }
+        .kyc-id-upload-box.has-image { border-style:solid; border-color:#22c55e; background:#f0fdf4; }
+        .kyc-id-upload-box.error { border-color:#ef4444; background:#fef2f2; }
+        .kyc-id-label { font-size:0.78rem; font-weight:700; color:#475569; display:flex; align-items:center; gap:6px; text-transform:uppercase; letter-spacing:0.3px; }
+        .kyc-id-preview { width:100%; aspect-ratio: 1.6/1; background:white; border:1px solid #e2e8f0; border-radius:8px; overflow:hidden; display:flex; align-items:center; justify-content:center; position:relative; }
+        .kyc-id-preview img { width:100%; height:100%; object-fit:cover; display:none; }
+        .kyc-id-preview .kyc-id-placeholder { display:flex; flex-direction:column; align-items:center; gap:6px; color:#94a3b8; font-size:0.82rem; font-weight:500; }
+        .kyc-id-preview .kyc-id-placeholder i { font-size:1.6rem; opacity:0.6; }
+        .kyc-id-upload-box.has-image .kyc-id-preview img { display:block; }
+        .kyc-id-upload-box.has-image .kyc-id-placeholder { display:none; }
+        .kyc-id-actions { display:flex; gap:8px; }
+        .kyc-id-btn { flex:1; padding:10px 12px; border-radius:8px; font-size:0.85rem; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; border:1.5px solid #cbd5e1; background:white; color:#334155; transition:all 0.2s; }
+        .kyc-id-btn.primary { background:linear-gradient(135deg,#2563eb,#1d4ed8); color:white; border-color:#1d4ed8; }
+        .kyc-id-btn:hover { transform:translateY(-1px); }
+        .kyc-id-btn:disabled { opacity:0.5; cursor:not-allowed; transform:none; }
+        .kyc-id-hint { font-size:0.72rem; color:#64748b; line-height:1.4; }
+        @media(max-width:640px){ .kyc-id-upload-grid{grid-template-columns:1fr;} }
+
         /* ══════════════════════════════════════════════════════════════════
            MOBILE RESPONSIVE — optimized for smartphones
            ══════════════════════════════════════════════════════════════════ */
@@ -1361,7 +1805,7 @@
 
         @media (max-width: 900px) {
             .portal-header {
-                padding: 0 16px;
+                padding: 0 12px;
                 height: auto;
                 min-height: 64px;
                 flex-wrap: wrap;
@@ -1374,6 +1818,7 @@
             }
             .portal-header > div:first-child img {
                 height: 32px !important;
+                transform: scale(1.8) !important; /* inline scale(2.8) overflows on mobile */
             }
 
             .mobile-menu-btn { display: flex !important; align-items: center; justify-content: center; order: 2; }
@@ -1384,27 +1829,34 @@
             #tabContainer {
                 order: 4;
                 width: 100%;
-                overflow-x: auto;
-                -webkit-overflow-scrolling: touch;
-                scrollbar-width: none;
-                border-radius: 10px !important;
-                padding: 6px !important;
-                gap: 4px !important;
+                flex-wrap: wrap;               /* wrap pills instead of cutting them off */
+                justify-content: flex-start;   /* left-align rows so no pill floats alone */
+                border-radius: 14px !important;
+                padding: 5px !important;
+                gap: 3px !important;
             }
             #tabContainer::-webkit-scrollbar { display: none; }
             #tabContainer .nav-pill {
                 white-space: nowrap;
-                font-size: 0.82rem;
-                padding: 8px 14px;
-                flex-shrink: 0;
+                font-size: 0.78rem;
+                padding: 8px 6px;
+                min-height: 36px;
+                flex: 1 1 auto;                /* pills share the row evenly */
+                text-align: center;
             }
 
             .portal-header > div:last-child {
                 width: auto !important;
                 gap: 10px !important;
+                min-width: 0;
             }
-            .portal-header > div:last-child > div:first-child {
-                display: none;
+            /* Long greetings truncate instead of crushing the header */
+            .header-greeting { max-width: 30vw; }
+            #portalGreeting {
+                font-size: 0.88rem;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
             }
 
             .portal-content {
@@ -1508,7 +1960,12 @@
                 font-size: 1rem !important;
             }
             .profile-qr-box {
-                display: none;
+                display: flex;                 /* keep the Digital ID QR usable on phones */
+                padding: 20px;
+                background: white;
+                border: 1px solid var(--border-color);
+                border-radius: 16px;
+                box-shadow: 0 4px 15px rgba(0,0,0,0.02);
             }
 
             /* ── KYC MOBILE ── */
@@ -1586,8 +2043,8 @@
             }
 
             .benefit-sub-grid {
-                grid-template-columns: 1fr;
-                gap: 6px;
+                flex-direction: column;
+                gap: 10px;
             }
         }
 
@@ -1600,9 +2057,19 @@
                 font-size: 1.1rem;
             }
 
+            /* Compact header on small phones */
+            .portal-header > div:first-child img {
+                height: 30px !important;
+                transform: scale(1.6) !important;
+            }
+            .header-manual span { display: none; }
+            .header-manual i { font-size: 1.1rem !important; margin-bottom: 0; }
+            .portal-header > div:last-child { gap: 12px !important; }
+
             #tabContainer .nav-pill {
                 font-size: 0.75rem;
-                padding: 6px 10px;
+                padding: 7px 8px;
+                min-height: 34px;
             }
 
             .stat-icon-wrapper {
@@ -1617,6 +2084,12 @@
             .pension-block .block-text h2 {
                 font-size: 1.2rem;
             }
+
+            /* Lists and cards wrap instead of overflowing */
+            .notif-item { flex-wrap: wrap; gap: 8px; }
+            .benefit-card { flex-wrap: wrap; gap: 12px; }
+            .health-log-item { flex-wrap: wrap; gap: 10px; }
+            .history-entry { padding: 12px 14px; }
 
             .kyc-card > #verificationFormFlow {
                 padding: 16px 12px;
@@ -1640,6 +2113,15 @@
             .section-card-title {
                 font-size: 1rem;
             }
+
+            /* Toast spans the screen so messages are never cut off */
+            .toast-notification {
+                left: 16px;
+                right: 16px;
+                bottom: 16px;
+                padding: 12px 16px;
+                font-size: 0.9rem;
+            }
         }
     </style>
 </head>
@@ -1656,6 +2138,7 @@
             <button class="nav-pill active" data-tab="dashboard">Dashboard</button>
             <button class="nav-pill" data-tab="profile">Profile</button>
             <button class="nav-pill" data-tab="benefits">Benefits</button>
+            <button class="nav-pill" data-tab="health">Appointments</button>
 
             <button class="nav-pill" data-tab="verification" id="navPillVerification" style="color: #ef4444; font-weight: 700;"><i class="fas fa-user-shield" style="margin-right: 5px;"></i>Get Verified</button>
             <button class="nav-pill" data-tab="notifications" style="position: relative;">
@@ -1674,11 +2157,15 @@
 
         <!-- Right Side User Menu (Identical layout to employee/admin) -->
         <div style="display: flex; align-items: center; gap: 20px; width: 250px; justify-content: flex-end;">
-            <div style="text-align: right; line-height: 1.2;">
+            <a href="/user-manual" target="_blank" title="Open the User Manual" class="header-manual" style="display: flex; flex-direction: column; align-items: center; justify-content: center; color: #059669; text-decoration: none;">
+                <i class="fas fa-book-open" style="font-size: 1.2rem; margin-bottom: 3px;"></i>
+                <span style="font-size: 0.7rem; font-weight: 700;">MANUAL</span>
+            </a>
+            <div class="header-greeting" style="text-align: right; line-height: 1.2; min-width: 0;">
                 <div style="font-size: 0.75rem; color: #64748b; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;">Senior Portal</div>
                 <div id="portalGreeting" style="font-size: 0.95rem; color: #1e293b; font-weight: 600; margin-top: 3px;">Loading...</div>
             </div>
-            <div style="height: 35px; width: 1px; background: #cbd5e1;"></div>
+            <div class="header-divider" style="height: 35px; width: 1px; background: #cbd5e1; flex-shrink: 0;"></div>
             <div id="logoutBtn" style="display: flex; flex-direction: column; align-items: center; justify-content: center; color: #ef4444; cursor: pointer; transition: 0.2s;" onmouseover="this.style.opacity='0.7'" onmouseout="this.style.opacity='1'">
                 <i class="fas fa-sign-out-alt" style="font-size: 1.2rem; margin-bottom: 3px;"></i>
                 <span style="font-size: 0.7rem; font-weight: 700;">LOGOUT</span>
@@ -1693,8 +2180,6 @@
             <ul class="sidebar-links">
                 <li><a class="sidebar-link" data-service="burial"><i class="fas fa-ribbon"></i> Burial Assistance</a></li>
                 <li><a class="sidebar-link" data-service="bedridden"><i class="fas fa-bed"></i> Bedridden</a></li>
-                <li><a class="sidebar-link" data-service="octogenarian"><i class="fas fa-birthday-cake"></i> Octogenarian</a></li>
-                <li><a class="sidebar-link" data-service="centarian"><i class="fas fa-award"></i> Centarian</a></li>
             </ul>
         </nav>
 
@@ -1718,6 +2203,16 @@
                         </div>
 
                         <div class="stat-card">
+                            <div class="stat-icon-wrapper stat-purple">
+                                <i class="fas fa-award"></i>
+                            </div>
+                            <div class="stat-details">
+                                <span class="stat-label">Senior Category</span>
+                                <span class="stat-value" id="dashSeniorCategory">—</span>
+                            </div>
+                        </div>
+
+                        <div class="stat-card">
                             <div class="stat-icon-wrapper stat-orange">
                                 <i class="fas fa-exclamation-triangle"></i>
                             </div>
@@ -1733,31 +2228,31 @@
                             </div>
                             <div class="stat-details">
                                 <span class="stat-label">Active Benefits</span>
-                                <span class="stat-value" id="dashActiveBenefits">2</span>
+                                <span class="stat-value" id="dashActiveBenefits">0</span>
                             </div>
                         </div>
                     </div>
 
                     <!-- Row 2: Pension Release & Priority Score -->
                     <div class="dashboard-row-2">
-                        <!-- Next Pension Release -->
+                        <!-- Next Pension Release / Approved Assistance Block -->
                         <div class="pension-block">
                             <div class="block-text">
-                                <h4>Next Pension Release</h4>
+                                <h4 id="pensionBlockTitle">Next Pension Release</h4>
                                 <h2 id="pensionDate">Loading...</h2>
-                                <p id="pensionAmount">Amount: ₱1,500</p>
+                                <p id="pensionAmount">Loading...</p>
                             </div>
-                            <i class="far fa-calendar-alt block-icon"></i>
+                            <i class="far fa-calendar-alt block-icon" id="pensionBlockIcon"></i>
                         </div>
 
-                        <!-- My Profile Card -->
+                        <!-- My Profile / Request Assistance Card -->
                         <div class="priority-block" style="background: linear-gradient(135deg, #1e40af, #3b82f6);">
                             <div style="display: flex; justify-content: space-between; align-items: flex-start; width: 100%; margin-bottom: 15px;">
                                 <div>
-                                    <h4 style="font-size: 0.85rem; font-weight: 500; opacity: 0.85; margin-bottom: 4px;">OSCA ID</h4>
+                                    <h4 id="dashRequestLabel" style="font-size: 0.85rem; font-weight: 500; opacity: 0.85; margin-bottom: 4px;">OSCA ID</h4>
                                     <h2 id="dashSeniorId" style="font-size: 1.5rem; font-weight: 700; letter-spacing: 1px;">Loading...</h2>
                                 </div>
-                                <i class="fas fa-id-card block-icon" style="font-size: 2.8rem; opacity: 0.2;"></i>
+                                <i class="fas fa-id-card block-icon" id="dashRequestIcon" style="font-size: 2.8rem; opacity: 0.2;"></i>
                             </div>
                             <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
                                 <span id="dashKycBadge" style="padding: 4px 14px; border-radius: 20px; font-size: 0.8rem; font-weight: 700; background: rgba(255,255,255,0.2); color: white;">Not Verified</span>
@@ -1810,8 +2305,8 @@
                                     <input type="text" id="editOscaId" style="padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-weight: 600; color: #64748b; font-size: 1rem; background: #e2e8f0;" readonly>
                                 </div>
                                 <div class="profile-field-group">
-                                    <label class="profile-field-label" for="editEmail">Email Address *</label>
-                                    <input type="email" id="editEmail" style="padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-weight: 600; color: var(--text-main); font-size: 1rem; background: #f8fafc;" required>
+                                    <label class="profile-field-label">Email Address (Read-Only)</label>
+                                    <input type="email" id="editEmail" readonly tabindex="-1" style="padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-weight: 600; color: #64748b; font-size: 1rem; background: #e2e8f0; cursor: not-allowed;" title="Email address cannot be changed. Please contact OSCA staff if you need to update it.">
                                 </div>
                                 <div class="profile-field-group">
                                     <label class="profile-field-label" for="editSex">Sex</label>
@@ -1821,8 +2316,8 @@
                                     </select>
                                 </div>
                                 <div class="profile-field-group">
-                                    <label class="profile-field-label" for="editDob">Date of Birth</label>
-                                    <input type="date" id="editDob" style="padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-weight: 600; color: var(--text-main); font-size: 1rem; background: #f8fafc;">
+                                    <label class="profile-field-label">Date of Birth (Read-Only)</label>
+                                    <input type="date" id="editDob" readonly tabindex="-1" style="padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-weight: 600; color: #64748b; font-size: 1rem; background: #e2e8f0; cursor: not-allowed; pointer-events: none;" title="Date of birth cannot be changed. Please contact OSCA staff if correction is needed." onkeydown="return false" onpaste="return false">
                                 </div>
                                 <div class="profile-field-group">
                                     <label class="profile-field-label" for="editCivil">Civil Status</label>
@@ -1844,103 +2339,362 @@
                         </form>
 
                         <div class="profile-qr-box">
-                            <div class="profile-qr-code">
-                                <i class="fas fa-qrcode"></i>
+                            <div class="profile-qr-code" id="profileQrCodeBox" style="position: relative; overflow: hidden;">
+                                <div id="qrLoadingState" style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; background: #f8fafc;">
+                                    <i class="fas fa-spinner fa-spin" style="font-size: 1.4rem; color: #2563eb;"></i>
+                                    <span style="font-size: 0.65rem; color: #64748b; font-weight: 600;">Loading QR...</span>
+                                </div>
+                                <img id="seniorQrImage" alt="Your Digital ID QR Code" style="display: none; width: 100%; height: 100%; object-fit: contain; background: #ffffff; border-radius: 12px;">
+                                <div id="qrErrorState" style="position: absolute; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 6px; background: #f8fafc; padding: 8px; text-align: center;">
+                                    <i class="fas fa-exclamation-triangle" style="font-size: 1.2rem; color: #f59e0b;"></i>
+                                    <span style="font-size: 0.62rem; color: #64748b; font-weight: 600;">Failed to load QR</span>
+                                    <button type="button" id="qrRetryBtn" style="border: none; background: #2563eb; color: #fff; font-size: 0.62rem; font-weight: 700; padding: 4px 10px; border-radius: 8px; cursor: pointer;">Retry</button>
+                                </div>
                             </div>
                             <p style="font-size: 0.85rem; font-weight: 700; color: var(--text-main); margin-bottom: 2px;">Scan for Verification</p>
-                            <p style="font-size: 0.75rem; color: var(--text-muted); font-weight: 500;">OSCA Magalang Office</p>
+                            <p style="font-size: 0.75rem; color: var(--text-muted); font-weight: 500;" id="qrOscaIdLabel">OSCA Magalang Office</p>
+                            <button type="button" id="downloadDigitalIdBtn" style="margin-top: 10px; border: none; background: linear-gradient(135deg, #2563eb, #3b82f6); color: #fff; font-size: 0.72rem; font-weight: 700; padding: 8px 14px; border-radius: 10px; cursor: pointer; box-shadow: 0 3px 8px rgba(37, 99, 235, 0.25); display: flex; align-items: center; gap: 6px;">
+                                <i class="fas fa-download"></i> Download Digital ID
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- ── UPDATE HEALTH + MEDICAL CERTIFICATION (VERIFIED SENIOR ACCOUNTS ONLY) ── -->
+                    <div id="healthUpdateCard" style="background:white; border-radius:20px; padding:30px; border:1px solid var(--border-color); box-shadow:0 4px 15px rgba(0,0,0,0.02); margin-top:24px;">
+                        <div style="display:flex; align-items:flex-start; gap:14px; border-bottom:2px solid #f1f5f9; padding-bottom:16px; margin-bottom:20px;">
+                            <div style="width:46px; height:46px; border-radius:14px; background:#ecfdf5; color:#059669; display:flex; align-items:center; justify-content:center; font-size:1.25rem; flex-shrink:0;"><i class="fas fa-notes-medical"></i></div>
+                            <div>
+                                <h3 style="margin:0 0 4px; color:#1e293b; font-size:1.1rem; font-weight:700;">Update Health &amp; Medical Certification</h3>
+                                <p style="margin:0; color:#64748b; font-size:0.85rem; line-height:1.5;">Tell OSCA about your illness and upload your <strong>medical certification</strong> (doctor's certificate, medical abstract, laboratory result or prescription). OSCA staff will review it and update your health record and priority level.</p>
+                            </div>
+                        </div>
+
+                        <!-- Locked notice — shown when the account is NOT yet verified -->
+                        <div id="healthUpdateLockedBox" style="display:none; background:#fffbeb; border:1px solid #fde68a; border-radius:12px; padding:18px 20px; color:#92400e; font-size:0.9rem; line-height:1.6;">
+                            <i class="fas fa-lock" style="margin-right:8px;"></i><strong>This feature is for verified senior accounts only.</strong><br>
+                            Complete your identity verification first — then you can send a health update with your medical certification.
+                            <button type="button" onclick="window.switchTab('verification')" style="display:block; margin-top:12px; border:none; background:#f59e0b; color:white; font-weight:700; padding:10px 18px; border-radius:10px; cursor:pointer; font-size:0.85rem;"><i class="fas fa-user-shield"></i> Go to Get Verified</button>
+                        </div>
+
+                        <!-- Unlocked form — shown only for VERIFIED senior accounts -->
+                        <div id="healthUpdateForm" style="display:none;">
+
+                            <!-- Privacy / process notice (RA 10173) -->
+                            <div style="background:#f0f9ff; border:1px solid #bae6fd; border-radius:12px; padding:14px 18px; margin-bottom:20px; font-size:0.85rem; color:#075985; line-height:1.6;">
+                                <i class="fas fa-shield-halved" style="margin-right:8px;"></i>
+                                Your medical certification is stored in a <strong>private vault</strong> and is only visible to authorized OSCA staff through a short-lived secure link. OSCA staff will review it and set your official health record and priority level.
+                            </div>
+
+                            <!-- Step 1: Do you have an illness? -->
+                            <div style="margin-bottom:16px;">
+                                <label style="display:block; font-size:0.78rem; font-weight:700; color:#475569; margin-bottom:6px;">Do you have an illness or health condition? <span style="color:#dc2626;">*</span></label>
+                                <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                                    <button type="button" id="healthIllnessYesBtn" style="border:2px solid #cbd5e1; background:white; color:#475569; font-weight:600; font-size:0.88rem; padding:10px 18px; border-radius:10px; cursor:pointer; transition:0.15s;">Yes, I have an illness</button>
+                                    <button type="button" id="healthIllnessNoBtn" style="border:2px solid #cbd5e1; background:white; color:#475569; font-weight:600; font-size:0.88rem; padding:10px 18px; border-radius:10px; cursor:pointer; transition:0.15s;">No, I am healthy</button>
+                                </div>
+                                <input type="hidden" id="healthHasIllness" value="">
+                            </div>
+
+                            <!-- Healthy note — shown when the senior reports NO illness (certification not required) -->
+                            <div id="healthHealthyNote" style="display:none; margin-bottom:16px; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:12px; padding:14px 18px; font-size:0.85rem; color:#166534; line-height:1.6;">
+                                <i class="fas fa-circle-check" style="margin-right:8px;"></i>
+                                You reported <strong>no illness — healthy</strong>. A medical certification is <strong>not required</strong>. Just tap Submit below so OSCA can record that you are healthy.
+                            </div>
+
+                            <!-- Illness section — shown ONLY when the senior reports an illness -->
+                            <div id="healthIllnessSection" style="display:none;">
+                                <div style="margin-bottom:16px;">
+                                    <label style="display:block; font-size:0.78rem; font-weight:700; color:#475569; margin-bottom:6px;">Illness / Health Condition <span style="color:#dc2626;">*</span></label>
+                                    <select id="healthIllnessSelect" style="width:100%; padding:11px 13px; border:1px solid #cbd5e1; border-radius:8px; font-size:0.92rem; box-sizing:border-box; background:white;">
+                                        <option value="">Select your illness or health condition...</option>
+                                        <option value="Hypertension">Hypertension</option>
+                                        <option value="Diabetes">Diabetes</option>
+                                        <option value="Arthritis">Arthritis</option>
+                                        <option value="Asthma">Asthma</option>
+                                        <option value="Heart disease">Heart disease</option>
+                                        <option value="Stroke">Stroke</option>
+                                        <option value="Kidney failure / Dialysis">Kidney failure / Dialysis</option>
+                                        <option value="Cancer">Cancer</option>
+                                        <option value="Dementia / Alzheimer's">Dementia / Alzheimer's</option>
+                                        <option value="Bedridden">Bedridden</option>
+                                        <option value="__manual__">Enter manually</option>
+                                    </select>
+                                    <input type="text" id="healthIllnessManualInput" maxlength="160" placeholder="Type your illness or health condition (e.g. Osteoporosis)" style="display:none; margin-top:10px; width:100%; padding:11px 13px; border:1px solid #cbd5e1; border-radius:8px; font-size:0.92rem; box-sizing:border-box; background:white;">
+                                </div>
+
+                                <!-- Details (optional, only when an illness is reported) -->
+                                <div style="margin-bottom:16px;">
+                                    <label style="display:block; font-size:0.78rem; font-weight:700; color:#475569; margin-bottom:6px;">Details <span style="font-weight:400; color:#94a3b8;">(optional — symptoms, medicines, since when)</span></label>
+                                    <textarea id="healthIllnessDetails" rows="3" maxlength="1500" placeholder="Describe your condition so OSCA staff can assess it correctly." style="width:100%; padding:11px 13px; border:1px solid #cbd5e1; border-radius:8px; font-size:0.92rem; box-sizing:border-box; resize:vertical; font-family:inherit; background:white;"></textarea>
+                                </div>
+
+                                <!-- Medical certification — REQUIRED because an illness was reported -->
+                                <div id="healthCertSection" style="margin-bottom:16px;">
+                                    <label style="display:block; font-size:0.78rem; font-weight:700; color:#475569; margin-bottom:6px;">Medical Certification <span style="color:#dc2626;">*</span> <span style="font-weight:400; color:#94a3b8;">(required because you reported an illness)</span></label>
+                                    <div id="healthCertDrop" style="border:2px dashed #cbd5e1; border-radius:12px; background:#f8fafc; padding:22px; text-align:center; cursor:pointer; transition:0.2s;">
+                                        <input type="file" id="healthCertInput" accept="image/jpeg,image/png,image/webp,application/pdf" style="display:none;">
+                                        <i class="fas fa-file-medical" style="font-size:1.6rem; color:#2563eb;"></i>
+                                        <p style="margin:10px 0 4px; font-size:0.9rem; font-weight:700; color:#1e293b;" id="healthCertTitle">Tap to attach your medical certification</p>
+                                        <p style="margin:0; font-size:0.75rem; color:#64748b;" id="healthCertHint">Doctor's certificate, medical abstract, laboratory result or prescription &mdash; JPG, PNG, WEBP or PDF (max 7 MB)</p>
+                                    </div>
+                                    <div id="healthCertPreview" style="display:none; margin-top:10px; align-items:center; gap:10px; background:#ecfdf5; border:1px solid #bbf7d0; border-radius:10px; padding:10px 14px;">
+                                        <i class="fas fa-paperclip" style="color:#059669;"></i>
+                                        <span id="healthCertFileName" style="font-size:0.85rem; font-weight:600; color:#166534; word-break:break-all;">No file selected</span>
+                                        <button type="button" id="healthCertRemoveBtn" style="margin-left:auto; border:none; background:transparent; color:#dc2626; font-size:0.8rem; font-weight:700; cursor:pointer;">Remove</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Inline feedback -->
+                            <div id="healthUpdateNotice" style="display:none; margin-bottom:14px; border-radius:10px; padding:12px 16px; font-size:0.86rem; line-height:1.5;"></div>
+
+                            <button type="button" id="healthUpdateSubmitBtn" style="width:100%; border:none; background:linear-gradient(135deg,#059669,#10b981); color:#fff; font-size:0.95rem; font-weight:700; padding:13px 20px; border-radius:12px; cursor:pointer; box-shadow:0 4px 12px rgba(5,150,105,0.25); display:flex; align-items:center; justify-content:center; gap:8px;">
+                                <i class="fas fa-paper-plane"></i> Submit Health Update
+                            </button>
+
+                            <p style="margin:12px 0 0; font-size:0.75rem; color:#94a3b8; text-align:center;">Submitting does not change your official record immediately — an OSCA employee reviews your certification first.</p>
+                        </div>
+
+                        <!-- Status of the most recent submission (visible to verified seniors) -->
+                        <div id="healthUpdateStatusBox" style="display:none; margin-top:20px;"></div>
+
+                        <!-- Official health record set by OSCA staff (human decision) -->
+                        <div id="healthOfficialBox" style="display:none; margin-top:20px;"></div>
+
+                        <!-- My submitted health updates (history) -->
+                        <div id="healthUpdateHistoryWrap" style="display:none; margin-top:20px; border-top:2px solid #f1f5f9; padding-top:18px;">
+                            <h4 style="margin:0 0 12px; font-size:0.95rem; font-weight:700; color:#1e293b; display:flex; align-items:center; gap:8px;">
+                                <i class="fas fa-clock-rotate-left" style="color:#2563eb;"></i> My Health Update Submissions
+                            </h4>
+                            <div id="healthUpdateHistory" style="display:flex; flex-direction:column; gap:10px;"></div>
                         </div>
                     </div>
                 </div>
 
-                <!-- TAB: BENEFITS -->
+                <!-- TAB: BENEFITS — Showcase: Assistance + Monthly Pension + Lifetime Total -->
                 <div class="tab-panel" id="panel-benefits">
-                    <h3 class="section-card-title" style="margin-bottom: 20px;">Your Benefits</h3>
-                    <div class="benefit-card-list" id="benefitsContainer">
-                        <!-- Benefit 1 -->
-                        <div class="benefit-card">
-                            <div class="benefit-card-left">
-                                <div class="benefit-gift-icon">
-                                    <i class="fas fa-gift"></i>
-                                </div>
-                                <div>
-                                    <div class="benefit-title">Monthly Pension <span class="benefit-badge">Approved</span></div>
-                                    <div class="benefit-sub-grid">
-                                        <div class="benefit-sub-item">
-                                            <span class="benefit-sub-label">Benefit amount</span>
-                                            <span class="benefit-sub-val">₱1,500</span>
-                                        </div>
-                                        <div class="benefit-sub-item">
-                                            <span class="benefit-sub-label">Next Release</span>
-                                            <span class="benefit-sub-val">₱1,500</span>
-                                        </div>
-                                    </div>
-                                </div>
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px; flex-wrap:wrap; gap:10px;">
+                        <div>
+                            <h3 class="section-card-title" style="margin:0 0 4px;">Your Benefits Showcase</h3>
+                            <p style="font-size:0.8rem; color:#64748b; margin:0;">Your personal assistance and pension history — lifetime total updates automatically when a new pension is claimed.</p>
+                        </div>
+                        <span style="font-size:0.7rem; font-weight:700; color:#166534; background:#dcfce7; border:1px solid #bbf7d0; padding:6px 12px; border-radius:20px; display:inline-flex; align-items:center; gap:6px;"><span style="width:7px; height:7px; background:#22c55e; border-radius:50%; display:inline-block;"></span> Live &amp; auto-updating</span>
+                    </div>
+
+                    <!-- Summary cards: Monthly Pension + Assistance + Lifetime Total -->
+                    <div class="benefits-showcase-grid">
+                        <!-- Monthly Pension -->
+                        <div class="benefits-summary-card card-pension">
+                            <div class="summary-icon"><i class="fas fa-hand-holding-dollar"></i></div>
+                            <div class="summary-content">
+                                <span class="summary-label">Monthly Pension</span>
+                                <span class="summary-value" id="showcasePensionAmount">—</span>
+                                <span class="summary-sub" id="showcasePensionStatus">Checking status...</span>
+                            </div>
+                            <span class="summary-badge badge-pending" id="showcasePensionBadge">Pending</span>
+                        </div>
+                        <!-- Assistance -->
+                        <div class="benefits-summary-card card-assistance">
+                            <div class="summary-icon"><i class="fas fa-hand-holding-heart"></i></div>
+                            <div class="summary-content">
+                                <span class="summary-label">Assistance Received</span>
+                                <span class="summary-value" id="showcaseAssistanceCount">0</span>
+                                <span class="summary-sub" id="showcaseAssistanceTotal">₱0 total assistance</span>
                             </div>
                         </div>
-
-                        <!-- Benefit 2 -->
-                        <div class="benefit-card">
-                            <div class="benefit-card-left">
-                                <div class="benefit-gift-icon">
-                                    <i class="fas fa-gift"></i>
-                                </div>
-                                <div>
-                                    <div class="benefit-title">Healthcare Assistance <span class="benefit-badge">Approved</span></div>
-                                    <div class="benefit-sub-grid">
-                                        <div class="benefit-sub-item">
-                                            <span class="benefit-sub-label">Benefit amount</span>
-                                            <span class="benefit-sub-val">₱5,000</span>
-                                        </div>
-                                        <div class="benefit-sub-item">
-                                            <span class="benefit-sub-label">Next Release</span>
-                                            <span class="benefit-sub-val">₱5,000</span>
-                                        </div>
-                                    </div>
-                                </div>
+                        <!-- Lifetime Total -->
+                        <div class="benefits-summary-card card-total">
+                            <div class="summary-icon"><i class="fas fa-sack-dollar"></i></div>
+                            <div class="summary-content">
+                                <span class="summary-label">Lifetime Total Received</span>
+                                <span class="summary-value" id="showcaseLifetimeTotal">₱0</span>
+                                <span class="summary-sub">From first to latest • updates on every new claim</span>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Contact OSCA details block instead of standard button -->
-                    <div class="assistance-alert-card">
-                        <div class="assistance-title">
-                            <i class="fas fa-info-circle"></i> Need Additional Assistance?
-                        </div>
-                        <div class="assistance-desc">
-                            Please contact OSCA staff directly for more information about available benefits.
-                        </div>
-                        
-                        <div class="assistance-contacts-grid">
-                            <div class="contact-detail-box">
-                                <div class="contact-detail-icon">
-                                    <i class="fas fa-phone-alt"></i>
-                                </div>
-                                <div class="contact-detail-info">
-                                    <span class="contact-detail-label">Mobile Number</span>
-                                    <span class="contact-detail-val">+63 967 890 1234</span>
-                                </div>
+                    <!-- History grids -->
+                    <div class="benefits-history-grid">
+                        <div class="benefits-history-card">
+                            <div class="history-card-header">
+                                <h4><i class="fas fa-calendar-alt"></i> Monthly Pension History</h4>
+                                <span class="history-count" id="pensionHistoryCount">0 records</span>
                             </div>
-
-                            <div class="contact-detail-box">
-                                <div class="contact-detail-icon">
-                                    <i class="fas fa-envelope"></i>
-                                </div>
-                                <div class="contact-detail-info">
-                                    <span class="contact-detail-label">Email Address</span>
-                                    <span class="contact-detail-val">osca.magalang.pampanga@gmail.com</span>
-                                </div>
+                            <div class="history-list" id="pensionHistoryList">
+                                <div class="benefits-empty-state"><i class="fas fa-calendar"></i><p>No pension records yet</p><span>Approved pensions will appear here</span></div>
+                            </div>
+                        </div>
+                        <div class="benefits-history-card">
+                            <div class="history-card-header">
+                                <h4><i class="fas fa-gift"></i> Assistance History</h4>
+                                <span class="history-count" id="assistanceHistoryCount">0 records</span>
+                            </div>
+                            <div class="history-list" id="assistanceHistoryList">
+                                <div class="benefits-empty-state"><i class="fas fa-hand-holding-heart"></i><p>No assistance records yet</p><span>Approved assistances will appear here</span></div>
                             </div>
                         </div>
                     </div>
+
+                    <!-- Hidden legacy container kept for backward-compat -->
+                    <div id="benefitsContainer" style="display:none;"></div>
                 </div>
 
 
+
+                <!-- TAB: APPOINTMENT SCHEDULING & QUEUING — Online Appointment only (per thesis) -->
+                <div class="tab-panel" id="panel-health">
+                    <!-- Booking + My queue number -->
+                    <div class="health-footer-grid" style="margin-bottom: 20px;">
+                        <div class="health-footer-box health-box-blue" id="seniorApptBookBox">
+                            <div>
+                                <div class="health-box-title" style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+                                    <span><i class="fas fa-calendar-plus" style="color:#2563eb; margin-right:6px;"></i>Online Appointment Booking</span>
+                                    <span id="seniorQueueBadge" style="font-size: 0.75rem; padding: 4px 10px; border-radius: 12px; font-weight: 700; background: #e0f2fe; color: #0284c7;">No Booking</span>
+                                </div>
+                                <div class="health-box-text" style="margin-top:8px;">Book a visit online. Your queue number is generated automatically.</div>
+                                <div id="apptPendingAlert" style="display:none; margin-top:10px; padding:10px 12px; background:#fef2f2; border:1px solid #fecaca; border-radius:8px; font-size:0.84rem; color:#991b1b; line-height:1.45;">
+                                    <i class="fas fa-exclamation-circle" style="margin-right:6px; color:#dc2626;"></i><span id="apptPendingAlertText"></span>
+                                </div>
+                                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:14px;">
+                                    <div>
+                                        <label style="display:block; font-size:0.78rem; font-weight:700; color:#475569; margin-bottom:4px;">Visit date *</label>
+                                        <input type="date" id="apptDate" style="width:100%; padding:10px 12px; border:1px solid #cbd5e1; border-radius:8px; font-size:0.92rem; box-sizing:border-box;">
+                                    </div>
+                                    <div>
+                                        <label style="display:block; font-size:0.78rem; font-weight:700; color:#475569; margin-bottom:4px;">Time *</label>
+                                        <input type="time" id="apptTime" value="09:00" style="width:100%; padding:10px 12px; border:1px solid #cbd5e1; border-radius:8px; font-size:0.92rem; box-sizing:border-box;">
+                                    </div>
+                                </div>
+                                <div style="margin-top:10px;">
+                                    <label style="display:block; font-size:0.78rem; font-weight:700; color:#475569; margin-bottom:4px;">Purpose of visit *</label>
+                                    <input type="text" id="apptService" list="apptServiceList" placeholder="Type purpose of visit" maxlength="100" style="width:100%; padding:10px 12px; border:1px solid #cbd5e1; border-radius:8px; font-size:0.92rem; box-sizing:border-box; background:white;">
+                                    <datalist id="apptServiceList">
+                                        <option value="General Consultation"></option>
+                                        <option value="Health Check-up"></option>
+                                        <option value="Pension Claim"></option>
+                                        <option value="Document Claiming"></option>
+                                        <option value="Assistance Follow-up"></option>
+                                    </datalist>
+                                </div>
+                                <div style="margin-top:10px;">
+                                    <label style="display:block; font-size:0.78rem; font-weight:700; color:#475569; margin-bottom:4px;">Note <span style="font-weight:400; color:#94a3b8;">(optional)</span></label>
+                                    <input type="text" id="apptNote" maxlength="300" style="width:100%; padding:10px 12px; border:1px solid #cbd5e1; border-radius:8px; font-size:0.92rem; box-sizing:border-box;">
+                                </div>
+                            </div>
+                            <button id="apptBookBtn" class="form-submit-btn" style="background:#2563eb; margin-top:14px; width:100%; text-align:center; justify-content:center;">
+                                <i class="fas fa-calendar-plus"></i> Book Appointment
+                            </button>
+                        </div>
+                        <div class="health-footer-box health-box-green" id="seniorQueueBox" style="background:#f0fdf4; border-color:#bbf7d0;">
+                            <div>
+                                <div class="health-box-title"><i class="fas fa-ticket-alt" style="color:#16a34a; margin-right:6px;"></i>My Queue Number</div>
+                                <div class="health-box-text" style="margin-top:8px;">Automatic queue number for your upcoming visit. Show this at the OSCA office.</div>
+                                <div id="seniorQueueNumber" style="margin-top:14px; font-size:2rem; font-weight:800; letter-spacing:1px; color:#15803d;">—</div>
+                                <div id="seniorQueueDetail" class="health-box-text" style="margin-top:6px;">No active appointment yet.</div>
+                                <div id="seniorQueueStatus" style="margin-top:10px;"></div>
+                            </div>
+                            <div class="health-box-text" style="margin-top:12px; font-size:0.8rem;">Please arrive 15 minutes early to reduce waiting time.</div>
+                        </div>
+                    </div>
+                    <!-- Add / Edit Reminder modal -->
+                    <div id="medReminderFormModal" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.6); z-index:9999; justify-content:center; align-items:center; padding:20px;">
+                        <div style="background:white; border-radius:16px; width:100%; max-width:460px; padding:26px; display:flex; flex-direction:column; gap:12px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                                <h3 style="font-size:1.1rem; font-weight:800; color:#1e293b; margin:0;"><i class="fas fa-bell" style="color:#16a34a; margin-right:6px;"></i><span id="medReminderFormTitle">Add Medication Reminder</span></h3>
+                                <span onclick="document.getElementById('medReminderFormModal').style.display='none'" style="font-size:1.6rem; color:#94a3b8; cursor:pointer; line-height:1;">&times;</span>
+                            </div>
+                            <input type="hidden" id="medReminderEditKey" value="">
+                            <div>
+                                <label style="display:block; font-size:0.78rem; font-weight:700; color:#475569; margin-bottom:4px;">Medicine name *</label>
+                                <input type="text" id="medReminderName" maxlength="80" placeholder="e.g. Amlodipine 5mg" style="width:100%; padding:10px 12px; border:1px solid #cbd5e1; border-radius:8px; font-size:0.95rem; box-sizing:border-box;">
+                            </div>
+                            <div>
+                                <label style="display:block; font-size:0.78rem; font-weight:700; color:#475569; margin-bottom:4px;">Dosage / instructions <span style="font-weight:400; color:#94a3b8;">(optional)</span></label>
+                                <input type="text" id="medReminderDosage" maxlength="120" placeholder="e.g. 1 tablet after breakfast" style="width:100%; padding:10px 12px; border:1px solid #cbd5e1; border-radius:8px; font-size:0.95rem; box-sizing:border-box;">
+                            </div>
+                            <div>
+                                <label style="display:block; font-size:0.78rem; font-weight:700; color:#475569; margin-bottom:4px;">Time to take *</label>
+                                <input type="time" id="medReminderTime" style="width:100%; padding:10px 12px; border:1px solid #cbd5e1; border-radius:8px; font-size:0.95rem; box-sizing:border-box;">
+                            </div>
+                            <div>
+                                <label style="display:block; font-size:0.78rem; font-weight:700; color:#475569; margin-bottom:6px;">Days</label>
+                                <div id="medReminderDays" style="display:flex; gap:8px; flex-wrap:wrap; font-size:0.85rem; font-weight:600; color:#334155;">
+                                    <label><input type="checkbox" value="0" checked> Sun</label>
+                                    <label><input type="checkbox" value="1" checked> Mon</label>
+                                    <label><input type="checkbox" value="2" checked> Tue</label>
+                                    <label><input type="checkbox" value="3" checked> Wed</label>
+                                    <label><input type="checkbox" value="4" checked> Thu</label>
+                                    <label><input type="checkbox" value="5" checked> Fri</label>
+                                    <label><input type="checkbox" value="6" checked> Sat</label>
+                                </div>
+                            </div>
+                            <button id="medReminderSaveBtn" class="form-submit-btn" style="background:#16a34a; width:100%; text-align:center; justify-content:center;">Save Reminder</button>
+                        </div>
+                    </div>
+                    <!-- Due-now popup -->
+                    <div id="medReminderDueModal" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.65); z-index:10001; justify-content:center; align-items:center; padding:20px;">
+                        <div style="background:white; border-radius:18px; width:100%; max-width:420px; padding:30px; text-align:center; box-shadow:0 25px 50px rgba(0,0,0,0.25);">
+                            <div style="width:70px; height:70px; background:#dcfce7; color:#16a34a; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:1.8rem; margin:0 auto 14px;"><i class="fas fa-pills"></i></div>
+                            <h3 style="margin:0 0 4px; color:#1e293b; font-size:1.25rem;">Time to take your medicine!</h3>
+                            <p id="medReminderDueText" style="color:#475569; font-size:1.05rem; margin:6px 0 18px; line-height:1.5;"></p>
+                            <button id="medReminderTakenBtn" style="background:#16a34a; color:white; border:none; width:100%; padding:14px; border-radius:10px; font-weight:800; font-size:1rem; cursor:pointer;"><i class="fas fa-check"></i> Mark as Taken</button>
+                            <button id="medReminderSnoozeBtn" style="background:#f1f5f9; color:#475569; border:none; width:100%; padding:12px; border-radius:10px; font-weight:700; font-size:0.9rem; cursor:pointer; margin-top:10px;">Remind me in 10 minutes</button>
+                        </div>
+                    </div>
+
+                    <!-- Daily schedule + Attendance tracking -->
+                    <div class="health-card">
+                        <div class="health-header">
+                            <div class="health-header-icon" style="background: #e0f2fe; color: #0284c7;">
+                                <i class="fas fa-clipboard-list"></i>
+                            </div>
+                            <div style="flex:1;">
+                                <h3>My Daily Schedule</h3>
+                                <p>Your booked visits and attendance: Attended / Missed / Rescheduled</p>
+                            </div>
+                            <button id="apptRefreshBtn" title="Refresh schedule" style="border:1px solid #cbd5e1; background:white; border-radius:8px; padding:8px 12px; cursor:pointer; color:#334155; font-weight:700; font-size:0.82rem;">
+                                <i class="fas fa-sync-alt"></i> Refresh
+                            </button>
+                        </div>
+                        <div class="health-logs-list" id="apptList">
+                            <div style="text-align:center; color:#94a3b8; padding:30px 0;">
+                                <i class="fas fa-spinner fa-spin" style="font-size:1.2rem; margin-bottom:8px;"></i><br>
+                                Loading your appointments...
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Reschedule modal -->
+                    <div id="apptReschedModal" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.6); z-index:9999; justify-content:center; align-items:center; padding:20px;">
+                        <div style="background:white; border-radius:16px; width:100%; max-width:440px; padding:26px; display:flex; flex-direction:column; gap:14px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                                <h3 style="font-size:1.1rem; font-weight:800; color:#1e293b;"><i class="fas fa-calendar-alt" style="color:#2563eb; margin-right:6px;"></i>Reschedule Visit</h3>
+                                <span id="apptReschedClose" style="font-size:1.6rem; color:#94a3b8; cursor:pointer; line-height:1;">&times;</span>
+                            </div>
+                            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                                <div>
+                                    <label style="display:block; font-size:0.78rem; font-weight:700; color:#475569; margin-bottom:4px;">New date *</label>
+                                    <input type="date" id="apptReschedDate" style="width:100%; padding:10px 12px; border:1px solid #cbd5e1; border-radius:8px; box-sizing:border-box;">
+                                </div>
+                                <div>
+                                    <label style="display:block; font-size:0.78rem; font-weight:700; color:#475569; margin-bottom:4px;">New time *</label>
+                                    <input type="time" id="apptReschedTime" value="09:00" style="width:100%; padding:10px 12px; border:1px solid #cbd5e1; border-radius:8px; box-sizing:border-box;">
+                                </div>
+                            </div>
+                            <button id="apptReschedConfirmBtn" class="form-submit-btn" style="background:#2563eb; width:100%; text-align:center; justify-content:center;">Confirm Reschedule</button>
+                        </div>
+                    </div>
+                </div>
 
                 <!-- TAB: NOTIFICATIONS -->
                 <div class="tab-panel" id="panel-notifications">
                     <div class="list-section-card">
-                        <h3 class="section-card-title">All Notifications</h3>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
+                            <h3 class="section-card-title" style="margin: 0;">All Notifications</h3>
+                            <button id="clearAllNotificationsBtn" style="background: #fee2e2; color: #ef4444; border: 1px solid #fca5a5; padding: 8px 16px; border-radius: 8px; font-weight: 600; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.2s;" onmouseover="this.style.background='#f87171'; this.style.color='white';" onmouseout="this.style.background='#fee2e2'; this.style.color='#ef4444';">
+                                <i class="fas fa-trash-alt"></i> Clear All Notifications
+                            </button>
+                        </div>
                         <div class="notif-list" id="allNotificationsList">
                             <div class="notif-item">
                                 <div class="notif-left">
@@ -1980,10 +2734,20 @@
                                     <div class="kyc-step-circle">1</div>
                                     <span class="kyc-step-label">Personal Info</span>
                                 </div>
-                                <div class="kyc-step-connector"></div>
+                                <div class="kyc-step-connector" id="kycConnector1"></div>
                                 <div class="kyc-step" id="kycStep2">
                                     <div class="kyc-step-circle">2</div>
                                     <span class="kyc-step-label">Face Scan</span>
+                                </div>
+                                <div class="kyc-step-connector" id="kycConnector2"></div>
+                                <div class="kyc-step" id="kycStep3">
+                                    <div class="kyc-step-circle">3</div>
+                                    <span class="kyc-step-label">Health Info</span>
+                                </div>
+                                <div class="kyc-step-connector" id="kycConnector3"></div>
+                                <div class="kyc-step" id="kycStep4">
+                                    <div class="kyc-step-circle">4</div>
+                                    <span class="kyc-step-label">Senior ID</span>
                                 </div>
                             </div>
 
@@ -2045,13 +2809,63 @@
                                     </div>
 
                                     <div class="kyc-field">
+                                        <label class="kyc-label">Date of Birth <span class="kyc-required">*</span></label>
+                                        <input type="date" id="kycDob" class="kyc-input" required>
+                                    </div>
+
+                                    <div class="kyc-field">
+                                        <label class="kyc-label">Age <span class="kyc-required">*</span></label>
+                                        <input type="number" id="kycAgeInput" class="kyc-input" placeholder="e.g. 82" min="1" max="130" required>
+                                    </div>
+
+                                    <div class="kyc-field">
                                         <label class="kyc-label">Cellphone Number <span class="kyc-required">*</span></label>
                                         <input type="tel" id="kycCpNumber" class="kyc-input" placeholder="e.g. 09123456789" pattern="[0-9\+]+" inputmode="numeric" required>
+                                    </div>
+
+                                    <div class="kyc-field">
+                                        <label class="kyc-label">Sex <span class="kyc-required">*</span></label>
+                                        <select id="kycSex" class="kyc-input" required style="cursor:pointer; background: white;">
+                                            <option value="">-- Select Sex --</option>
+                                            <option value="Male">Male</option>
+                                            <option value="Female">Female</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="kyc-field">
+                                        <label class="kyc-label">Civil Status <span class="kyc-required">*</span></label>
+                                        <select id="kycCivilStatus" class="kyc-input" required style="cursor:pointer; background: white;">
+                                            <option value="">-- Select Civil Status --</option>
+                                            <option value="Single">Single</option>
+                                            <option value="Married">Married</option>
+                                            <option value="Widowed">Widowed</option>
+                                            <option value="Others">Others</option>
+                                        </select>
                                     </div>
                                 </div>
 
                                 <button type="button" id="kycNextBtn" class="kyc-next-btn">
+                                    Continue to Face Scan <i class="fas fa-arrow-right"></i>
+                                </button>
+                            </div>
+
+                            <!-- Benefit Program interstitial (80+ only, unnumbered).
+                                 Shown between Personal Info and Face Scan when it applies. -->
+                            <div id="kycStepFormContent" style="display: none;">
+                                <div class="kyc-form-header">
+                                    <h3><i class="fas fa-file-signature"></i> <span id="kycStepFormTitle">Benefit Program Form</span></h3>
+                                    <p id="kycStepFormSubtitle">Based on your age, please complete the required Benefit Program application form.</p>
+                                </div>
+
+                                <!-- Age-based milestone form (Octogenarian / Nonagenarian / Centenarian) -->
+                                <div id="kycMilestoneSection" style="display:none;"></div>
+
+                                <button type="button" id="kycFormNextBtn" class="kyc-next-btn">
                                     Next: Scan Your Face <i class="fas fa-arrow-right"></i>
+                                </button>
+
+                                <button type="button" id="kycFormBackBtn" class="kyc-back-btn">
+                                    <i class="fas fa-arrow-left"></i> Back to Personal Information
                                 </button>
                             </div>
 
@@ -2088,6 +2902,126 @@
                                     <i class="fas fa-arrow-left"></i> Back to Information
                                 </button>
                             </div>
+
+                            <!-- Step 3: Health Condition / Illness (Step 4 Senior ID comes after).
+                                 Seniors with a reported illness are automatically marked HIGH priority,
+                                 even when the age-based milestone criteria do not apply. -->
+                            <div id="kycStep3Content" style="display: none;">
+                                <div class="kyc-form-header">
+                                    <h3><i class="fas fa-heart-pulse"></i> Health Condition / Illness</h3>
+                                    <p>Step 3 of 4 — please tell us about any illness or health condition you have. OSCA uses this to prioritize assistance for seniors with medical needs.</p>
+                                </div>
+
+                                <div class="kyc-field">
+                                    <label class="kyc-label">Do you have any illness / health condition? <span class="kyc-required">*</span></label>
+                                    <select id="kycIllnessSelect" class="kyc-input" style="cursor:pointer; background: white;">
+                                        <option value="">-- Select --</option>
+                                        <option value="None">No Illness / Healthy</option>
+                                        <option value="Hypertension">Hypertension (High Blood Pressure)</option>
+                                        <option value="Diabetes">Diabetes</option>
+                                        <option value="Heart Disease">Heart Disease</option>
+                                        <option value="Cancer">Cancer</option>
+                                        <option value="Stroke">Stroke</option>
+                                        <option value="Bedridden">Bedridden</option>
+                                        <option value="Asthma">Asthma</option>
+                                        <option value="Kidney Disease">Kidney Disease / Dialysis</option>
+                                        <option value="Dementia">Dementia / Alzheimer's</option>
+                                        <option value="Other">Enter manually</option>
+                                    </select>
+                                </div>
+
+                                <div class="kyc-field" id="kycIllnessOtherWrap" style="display: none;">
+                                    <label class="kyc-label">Enter manually - specify your illness</label>
+                                    <input type="text" id="kycIllnessOther" class="kyc-input" placeholder="e.g. Osteoarthritis" maxlength="100">
+                                </div>
+
+                                <div class="kyc-field" id="kycMedCertWrap" style="display: none;">
+                                    <label class="kyc-label">Medical Certification <span class="kyc-required">*</span> <span style="font-weight:400; color:#64748b;">(required when an illness is selected)</span></label>
+                                    <div class="kyc-upload-zone" id="kycMedCertBox" role="button" tabindex="0" aria-label="Upload medical certification">
+                                        <div class="kyc-upload-zone-icon"><i class="fas fa-file-medical"></i></div>
+                                        <div class="kyc-upload-zone-body">
+                                            <p class="kyc-upload-zone-title">Tap to attach your medical certification <span>or drag &amp; drop it here</span></p>
+                                            <p class="kyc-upload-zone-sub">Doctor's certificate, medical abstract, laboratory result or prescription &bull; JPG, PNG, WEBP or PDF &bull; max 7 MB</p>
+                                            <p class="kyc-upload-zone-skip"><i class="fas fa-circle-check"></i> Not required when you select <strong>No Illness / Healthy</strong></p>
+                                        </div>
+                                        <span class="kyc-upload-zone-btn"><i class="fas fa-cloud-arrow-up"></i> Choose file</span>
+                                    </div>
+                                    <input type="file" id="kycMedCertInput" accept="image/jpeg,image/png,image/webp,application/pdf" style="display: none;">
+                                    <p class="kyc-error" id="kycMedCertError" style="display: none;"></p>
+                                    <div class="kyc-med-chip" id="kycMedCertPreview" style="display: none;">
+                                        <div class="kyc-med-chip-icon" id="kycMedCertIcon"><i class="fas fa-file-medical"></i></div>
+                                        <img id="kycMedCertImg" alt="Medical certification preview">
+                                        <div class="kyc-med-chip-meta">
+                                            <div class="kyc-med-chip-name" id="kycMedCertName">No file attached</div>
+                                            <div class="kyc-med-chip-sub" id="kycMedCertSub">Ready for review</div>
+                                        </div>
+                                        <button type="button" id="kycMedCertRemove">Remove</button>
+                                    </div>
+                                </div>
+
+                                <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:10px; padding:12px 14px; margin:14px 0; color:#991b1b; font-size:0.85rem; line-height:1.5;">
+                                    <strong><i class="fas fa-triangle-exclamation"></i> Note:</strong> Seniors with a reported illness are automatically marked <strong>High Priority</strong> for assistance — even if the age-based criteria do not apply. Please answer honestly; OSCA staff will verify this information during review.
+                                </div>
+
+                                <button type="button" id="kycHealthNextBtn" class="kyc-next-btn">
+                                    Continue to Senior ID <i class="fas fa-arrow-right"></i>
+                                </button>
+
+                                <button type="button" id="kycHealthBackBtn" class="kyc-back-btn">
+                                    <i class="fas fa-arrow-left"></i> Back to Face Scan
+                                </button>
+                            </div>
+
+                            <!-- Step 4: Senior Citizen ID (Back-to-Back) + Submit -->
+                            <div id="kycStep4Content" style="display: none;">
+                                <div class="kyc-form-header">
+                                    <h3><i class="fas fa-id-card"></i> Senior Citizen ID</h3>
+                                    <p>Final step — enter your OSCA ID number and upload clear photos of the <strong>front and back</strong> of your Senior Citizen ID. Both sides are <strong>required</strong>.</p>
+                                </div>
+                                <div class="kyc-field" style="margin-bottom: 16px;">
+                                    <label class="kyc-label">Senior Citizen ID Number <span class="kyc-required">*</span></label>
+                                    <input type="text" id="kycSeniorIdNumber" class="kyc-input" placeholder="e.g. OSCA-2024-0123" autocomplete="off">
+                                    <p class="kyc-id-hint" style="margin-top:6px;">Found on the front of your OSCA-issued Senior Citizen ID card.</p>
+                                    <p class="kyc-error" id="kycSeniorIdError" style="display: none;"></p>
+                                </div>
+                                <div class="kyc-id-upload-grid">
+                                    <div class="kyc-id-upload-box" id="kycIdFrontBox">
+                                        <div class="kyc-id-label"><i class="fas fa-id-card"></i> Front Side <span class="kyc-required">*</span></div>
+                                        <div class="kyc-id-preview" id="kycIdFrontPreview">
+                                            <div class="kyc-id-placeholder"><i class="fas fa-image"></i><span>No front photo yet</span></div>
+                                            <img id="kycIdFrontImg" alt="ID Front Preview">
+                                        </div>
+                                        <input type="file" id="kycIdFrontInput" accept="image/*" style="display:none;">
+                                        <div class="kyc-id-actions">
+                                            <button type="button" class="kyc-id-btn primary" id="kycIdFrontBtn"><i class="fas fa-upload"></i> Upload Front</button>
+                                            <button type="button" class="kyc-id-btn" id="kycIdFrontRemove" style="display:none;"><i class="fas fa-trash"></i> Remove</button>
+                                        </div>
+                                        <p class="kyc-id-hint">Photo, name and ID number must be readable.</p>
+                                    </div>
+                                    <div class="kyc-id-upload-box" id="kycIdBackBox">
+                                        <div class="kyc-id-label"><i class="fas fa-id-card"></i> Back Side <span class="kyc-required">*</span></div>
+                                        <div class="kyc-id-preview" id="kycIdBackPreview">
+                                            <div class="kyc-id-placeholder"><i class="fas fa-image"></i><span>No back photo yet</span></div>
+                                            <img id="kycIdBackImg" alt="ID Back Preview">
+                                        </div>
+                                        <input type="file" id="kycIdBackInput" accept="image/*" style="display:none;">
+                                        <div class="kyc-id-actions">
+                                            <button type="button" class="kyc-id-btn primary" id="kycIdBackBtn"><i class="fas fa-upload"></i> Upload Back</button>
+                                            <button type="button" class="kyc-id-btn" id="kycIdBackRemove" style="display:none;"><i class="fas fa-trash"></i> Remove</button>
+                                        </div>
+                                        <p class="kyc-id-hint">Address, signature and QR must be visible.</p>
+                                    </div>
+                                </div>
+                                <div id="kycIdUploadError" style="display:none; background:#fef2f2; border:1px solid #fecaca; color:#991b1b; padding:10px 12px; border-radius:8px; font-size:0.84rem; font-weight:600; margin-bottom:6px;"><i class="fas fa-exclamation-circle" style="margin-right:6px; color:#dc2626;"></i>Both front and back of your Senior ID are required. Please upload both sides.</div>
+                                <div class="kyc-review-box" id="kycReviewBox" style="display:none;"></div>
+                                <button type="button" id="kycSubmitBtn" class="kyc-scan-btn kyc-submit-btn">
+                                    <i class="fas fa-paper-plane"></i> Submit Verification
+                                </button>
+                                <p class="kyc-submit-hint">By submitting, you confirm that all details and documents above are true and belong to you. OSCA staff will verify them during review.</p>
+                                <button type="button" id="kycSeniorIdBackBtn" class="kyc-back-btn">
+                                    <i class="fas fa-arrow-left"></i> Back to Health Info
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -2112,6 +3046,19 @@
                             <!-- Wrapper for dynamic fields -->
                             <div id="dynamicFormFields"></div>
 
+                            <!-- Emergency Urgent Request (Request only) + honesty note -->
+                            <div class="urgent-request-box">
+                                <label class="urgent-toggle" for="urgentRequestToggle">
+                                    <input type="checkbox" id="urgentRequestToggle">
+                                    <span class="urgent-toggle-track"><span class="urgent-toggle-thumb"></span></span>
+                                    <span class="urgent-toggle-text">
+                                        <span class="urgent-toggle-title"><i class="fas fa-triangle-exclamation"></i> Emergency Urgent Request</span>
+                                        <span class="urgent-toggle-tag">Request only</span>
+                                    </span>
+                                </label>
+                                <p class="urgent-honesty-note"><i class="fas fa-circle-info"></i> <strong>Please be honest.</strong> Mark this request as urgent ONLY if your situation is a true emergency. Urgent requests are reviewed and processed first by OSCA staff — false urgent requests delay assistance for seniors who genuinely need it and may be declined after verification.</p>
+                            </div>
+
                             <button type="submit" class="form-submit-btn">Submit Assistance Claim</button>
                         </form>
                     </div>
@@ -2121,110 +3068,66 @@
         </div>
     </div>
 
-    <!-- Appointment Modal -->
-    <div id="appointmentModal" style="display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.6); backdrop-filter: blur(4px); z-index: 9999; justify-content: center; align-items: center; padding: 20px;">
-        <div style="background: white; border-radius: 16px; width: 100%; max-width: 450px; padding: 30px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; display: flex; flex-direction: column; gap: 20px; animation: fadeIn 0.2s ease-out;">
-            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eff6ff; padding-bottom: 15px;">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <div style="width: 40px; height: 40px; background: #eff6ff; border-radius: 50%; display: flex; justify-content: center; align-items: center; color: #3b82f6; font-size: 1.1rem;">
-                        <i class="far fa-calendar-check"></i>
+
+
+    <!-- Notification Detail Modal -->
+    <div id="notificationDetailModal" style="display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.6); backdrop-filter: blur(4px); z-index: 9999; justify-content: center; align-items: center; padding: 20px;">
+        <div style="background: white; border-radius: 16px; width: 100%; max-width: 520px; padding: 30px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; display: flex; flex-direction: column; gap: 20px; animation: fadeIn 0.2s ease-out;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #f1f5f9; padding-bottom: 15px;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div id="notifModalIconCircle" style="width: 44px; height: 44px; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 1.2rem; flex-shrink: 0; background: #e0f2fe; color: #0284c7;">
+                        <i id="notifModalIcon" class="fas fa-bell"></i>
                     </div>
-                    <h3 style="color: #1e293b; font-size: 1.2rem; font-weight: 700; margin: 0;">Schedule Check-up</h3>
+                    <div>
+                        <h3 id="notifModalTitle" style="color: #1e293b; font-size: 1.15rem; font-weight: 700; margin: 0 0 2px 0;">Notification Details</h3>
+                        <span id="notifModalTime" style="color: #64748b; font-size: 0.8rem; font-weight: 500;">Just now</span>
+                    </div>
                 </div>
-                <span id="closeAppointmentModal" style="font-size: 1.8rem; color: #94a3b8; cursor: pointer; font-weight: bold; line-height: 1;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#94a3b8'">&times;</span>
+                <span id="closeNotifDetailModal" style="font-size: 1.8rem; color: #94a3b8; cursor: pointer; font-weight: bold; line-height: 1;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#94a3b8'">&times;</span>
             </div>
             
-            <form id="appointmentForm" style="display: flex; flex-direction: column; gap: 15px;">
-                <div class="form-group">
-                    <label for="apptDoctor" style="font-size: 0.85rem; font-weight: 700; color: #475569; margin-bottom: 5px;">Select Doctor</label>
-                    <select id="apptDoctor" required style="width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.95rem; background: #f8fafc; outline: none;">
-                        <option value="Dr. Maria Santos">Dr. Maria Santos (Cardiology)</option>
-                        <option value="Dr. Juan Reyes">Dr. Juan Reyes (General Practice)</option>
-                        <option value="Dr. Elena Cruz">Dr. Elena Cruz (Geriatrics)</option>
-                    </select>
-                </div>
-                
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                    <div class="form-group">
-                        <label for="apptDate" style="font-size: 0.85rem; font-weight: 700; color: #475569; margin-bottom: 5px;">Preferred Date</label>
-                        <input type="date" id="apptDate" required style="width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.95rem; background: #f8fafc; outline: none;">
-                    </div>
-                    <div class="form-group">
-                        <label for="apptTime" style="font-size: 0.85rem; font-weight: 700; color: #475569; margin-bottom: 5px;">Preferred Time</label>
-                        <select id="apptTime" required style="width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.95rem; background: #f8fafc; outline: none;">
-                            <option value="09:00 AM">09:00 AM</option>
-                            <option value="10:00 AM">10:00 AM</option>
-                            <option value="11:00 AM">11:00 AM</option>
-                            <option value="02:00 PM">02:00 PM</option>
-                            <option value="03:00 PM">03:00 PM</option>
-                        </select>
-                    </div>
-                </div>
-                
-                <div class="form-group">
-                    <label for="apptReason" style="font-size: 0.85rem; font-weight: 700; color: #475569; margin-bottom: 5px;">Reason for Visit</label>
-                    <textarea id="apptReason" rows="3" placeholder="Briefly describe your symptoms or reason for check-up..." required style="width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.95rem; background: #f8fafc; outline: none; resize: none;"></textarea>
-                </div>
-                
-                <button type="submit" style="background: #3b82f6; color: white; border: none; padding: 14px; border-radius: 8px; font-weight: 700; font-size: 1rem; cursor: pointer; margin-top: 5px; box-shadow: 0 4px 10px rgba(59, 130, 246, 0.2); transition: background 0.2s;" onmouseover="this.style.background='#2563eb'" onmouseout="this.style.background='#3b82f6'">Confirm Appointment</button>
-            </form>
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; color: #334155; font-size: 0.95rem; line-height: 1.6;" id="notifModalBody">
+                <!-- Dynamic body content -->
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 10px;" id="notifModalActions">
+                <button id="notifModalDeleteBtn" style="background: #fee2e2; color: #ef4444; border: 1px solid #fca5a5; padding: 10px 16px; border-radius: 8px; font-weight: 600; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: background 0.2s;" onmouseover="this.style.background='#fca5a5'; this.style.color='#991b1b';" onmouseout="this.style.background='#fee2e2'; this.style.color='#ef4444';">
+                    <i class="fas fa-trash-alt"></i> Remove Notification
+                </button>
+                <button id="notifModalBtn" style="background: #2563eb; color: white; border: none; padding: 10px 20px; border-radius: 8px; font-weight: 600; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: background 0.2s;" onmouseover="this.style.background='#1d4ed8'" onmouseout="this.style.background='#2563eb'">
+                    <i class="fas fa-calendar-alt"></i> View Schedule
+                </button>
+            </div>
         </div>
     </div>
 
-    <!-- Medications Modal -->
-    <div id="medicationsModal" style="display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.6); backdrop-filter: blur(4px); z-index: 9999; justify-content: center; align-items: center; padding: 20px;">
-        <div style="background: white; border-radius: 16px; width: 100%; max-width: 500px; padding: 30px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; display: flex; flex-direction: column; gap: 20px; animation: fadeIn 0.2s ease-out;">
+    <!-- Prescription Refill Modal -->
+    <div id="medicationRequestModal" style="display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.6); backdrop-filter: blur(4px); z-index: 9999; justify-content: center; align-items: center; padding: 20px;">
+        <div style="background: white; border-radius: 16px; width: 100%; max-width: 550px; padding: 28px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; display: flex; flex-direction: column; gap: 20px; animation: fadeIn 0.2s ease-out;">
             <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #f0fdf4; padding-bottom: 15px;">
                 <div style="display: flex; align-items: center; gap: 10px;">
                     <div style="width: 40px; height: 40px; background: #f0fdf4; border-radius: 50%; display: flex; justify-content: center; align-items: center; color: #16a34a; font-size: 1.1rem;">
                         <i class="fas fa-pills"></i>
                     </div>
-                    <h3 style="color: #1e293b; font-size: 1.2rem; font-weight: 700; margin: 0;">Prescription History</h3>
+                    <h3 style="color: #1e293b; font-size: 1.2rem; font-weight: 700; margin: 0;">Prescription & Refill Requests</h3>
                 </div>
-                <span id="closeMedicationsModal" style="font-size: 1.8rem; color: #94a3b8; cursor: pointer; font-weight: bold; line-height: 1;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#94a3b8'">&times;</span>
+                <span onclick="document.getElementById('medicationRequestModal').style.display='none'" style="font-size: 1.8rem; color: #94a3b8; cursor: pointer; font-weight: bold; line-height: 1;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#94a3b8'">&times;</span>
             </div>
             
-            <div style="display: flex; flex-direction: column; gap: 15px; max-height: 400px; overflow-y: auto;">
-                <div style="border: 1px solid #e2e8f0; border-radius: 12px; padding: 15px; background: #f8fafc; border-left: 4px solid #22c55e;">
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
-                        <h4 style="color: #1e293b; font-size: 1.05rem; font-weight: 700; margin: 0;">Amlodipine (5mg)</h4>
-                        <span style="background: #dcfce7; color: #15803d; padding: 3px 8px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;">Active</span>
-                    </div>
-                    <p style="color: #475569; font-size: 0.9rem; margin: 0 0 10px 0;">Take 1 tablet daily (Morning)</p>
-                    <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: #64748b;">
-                        <span>Prescribed by: Dr. Juan Reyes</span>
-                        <span>Refills left: 2</span>
-                    </div>
-                </div>
-                
-                <div style="border: 1px solid #e2e8f0; border-radius: 12px; padding: 15px; background: #f8fafc; border-left: 4px solid #22c55e;">
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
-                        <h4 style="color: #1e293b; font-size: 1.05rem; font-weight: 700; margin: 0;">Metformin (500mg)</h4>
-                        <span style="background: #dcfce7; color: #15803d; padding: 3px 8px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;">Active</span>
-                    </div>
-                    <p style="color: #475569; font-size: 0.9rem; margin: 0 0 10px 0;">Take 1 tablet twice daily with meals</p>
-                    <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: #64748b;">
-                        <span>Prescribed by: Dr. Maria Santos</span>
-                        <span>Refills left: 1</span>
-                    </div>
-                </div>
-                
-                <div style="border: 1px solid #e2e8f0; border-radius: 12px; padding: 15px; background: #f8fafc; border-left: 4px solid #94a3b8; opacity: 0.8;">
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
-                        <h4 style="color: #64748b; font-size: 1.05rem; font-weight: 700; margin: 0;">Amoxicillin (500mg)</h4>
-                        <span style="background: #f1f5f9; color: #64748b; padding: 3px 8px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;">Completed</span>
-                    </div>
-                    <p style="color: #64748b; font-size: 0.9rem; margin: 0 0 10px 0;">Take 1 capsule every 8 hours for 7 days</p>
-                    <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: #94a3b8;">
-                        <span>Prescribed by: Dr. Elena Cruz</span>
-                        <span>Finished: Jan 15, 2026</span>
-                    </div>
-                </div>
+            <!-- Request Form -->
+            <form id="medicationRefillForm" style="display: flex; flex-direction: column; gap: 12px; background: #f8fafc; padding: 16px; border-radius: 12px; border: 1px solid #e2e8f0;">
+                <label style="font-weight: 700; color: #1e293b; font-size: 0.9rem;">Request New Medication / Refill</label>
+                <input type="text" id="medicationInputName" placeholder="Enter pill or medication name (e.g. Amlodipine 5mg)" required style="padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.9rem;">
+                <textarea id="medicationInputNotes" placeholder="Additional notes or dosage request (optional)" rows="2" style="padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.9rem; resize: none;"></textarea>
+                <button type="submit" style="background: #16a34a; color: white; border: none; padding: 10px 16px; border-radius: 8px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: background 0.2s;" onmouseover="this.style.background='#15803d'" onmouseout="this.style.background='#16a34a'">
+                    <i class="fas fa-paper-plane"></i> Submit Refill Request
+                </button>
+            </form>
+
+            <h4 style="margin: 5px 0 0; color: #1e293b; font-size: 1rem; font-weight: 700;">Your Medication Refill Statuses</h4>
+            <div id="medicationRequestsList" style="display: flex; flex-direction: column; gap: 12px; max-height: 250px; overflow-y: auto;">
+                <div style="text-align: center; color: #94a3b8; padding: 20px;">Loading medication requests...</div>
             </div>
-            
-            <button style="background: #10b981; color: white; border: none; padding: 12px; border-radius: 8px; font-weight: 700; font-size: 0.95rem; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 8px; box-shadow: 0 4px 10px rgba(16, 185, 129, 0.2); transition: background 0.2s;" onmouseover="this.style.background='#059669'" onmouseout="this.style.background='#10b981'" onclick="scNotify('success', 'Refill request sent to OSCA pharmacy!'); document.getElementById('closeMedicationsModal').click();">
-                <i class="fas fa-prescription-bottle-alt"></i> Request Prescription Refill
-            </button>
         </div>
     </div>
 
@@ -2235,6 +3138,7 @@
     </div>
 
     <!-- Include Javascript files -->
-    <script type="module" src="/js/senior.js"></script>
+    <script src="/js/notify.js?v=4"></script>
+    <script type="module" src="/js/senior.js?v=4"></script>
 </body>
 </html>

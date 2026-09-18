@@ -1,10 +1,154 @@
 import { auth, db } from './firebase-init.js';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-auth.js";
-import { ref, get, set } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-database.js";
+import { signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-auth.js";
+import { ref, get } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-database.js";
+
+// ============================================================
+// Two-Factor Authentication (E-mail OTP) for Admin & OSCA Staff.
+// Flow: password login -> server e-mails a 6-digit OTP via Gmail
+// SMTP (/api/2fa/start) -> the user MUST verify (/api/2fa/verify)
+// before the dashboard unlocks. No OTP = no login. Senior citizens
+// intentionally keep the simplified login (panel requirement).
+// ============================================================
+
+const PENDING_KEY = 'sc_2fa_pending';   // JSON { uid, role, email } while the OTP challenge is open
+const VERIFIED_KEY = 'sc_2fa_verified'; // uid that completed 2FA in this tab
+const RESEND_COOLDOWN_S = 30;           // mirrors TWOFA_RESEND_MS on the server
+const DEFAULT_ADMIN_EMAIL = 'admin@silvercare.com'; // Master Admin — exempt from OTP
+
+const ROLE_UI = {
+    admin:    { title: 'Admin Login', icon: 'fas fa-shield-alt', iconColor: '#3b82f6', buttonBg: '#3b82f6' },
+    employee: { title: 'OSCA Login',  icon: 'fas fa-users-cog',  iconColor: '#4a5568', buttonBg: '#4a5568' }
+};
+
+function readPending2FA() {
+    try {
+        const raw = sessionStorage.getItem(PENDING_KEY);
+        const parsed = raw ? JSON.parse(raw) : null;
+        return (parsed && parsed.uid && parsed.role) ? parsed : null;
+    } catch (err) {
+        return null;
+    }
+}
+
+function writePending2FA(state) {
+    sessionStorage.setItem(PENDING_KEY, JSON.stringify({ uid: state.uid, role: state.role, email: state.email || '' }));
+}
+
+function clearPending2FA() {
+    sessionStorage.removeItem(PENDING_KEY);
+}
+
+function is2FAVerified(uid) {
+    return sessionStorage.getItem(VERIFIED_KEY) === uid;
+}
+
+let resendTimer = null;
+function startResendCooldown(seconds = RESEND_COOLDOWN_S) {
+    const link = document.getElementById('resendOtpLink');
+    if (!link) return;
+    if (resendTimer) clearInterval(resendTimer);
+    let remaining = seconds;
+    const tick = () => {
+        if (remaining <= 0) {
+            clearInterval(resendTimer);
+            resendTimer = null;
+            link.textContent = 'Resend';
+            link.style.pointerEvents = 'auto';
+            link.style.opacity = '1';
+            return;
+        }
+        link.textContent = `Resend (${remaining}s)`;
+        remaining -= 1;
+    };
+    link.style.pointerEvents = 'none';
+    link.style.opacity = '0.5';
+    tick();
+    resendTimer = setInterval(tick, 1000);
+}
 
 document.addEventListener('DOMContentLoaded', () => {
     const loginForm = document.getElementById('loginForm');
+    const roleSelection = document.getElementById('roleSelection');
+    const loginFormContainer = document.getElementById('loginFormContainer');
+    const twoFAContainer = document.getElementById('twoFAContainer');
+    const forgotPwContainer = document.getElementById('forgotPwContainer');
+
+    function showScreen(which) {
+        if (roleSelection) roleSelection.style.display = which === 'roles' ? 'block' : 'none';
+        if (loginFormContainer) loginFormContainer.style.display = which === 'login' ? 'block' : 'none';
+        if (twoFAContainer) twoFAContainer.style.display = which === 'otp' ? 'block' : 'none';
+        if (forgotPwContainer) forgotPwContainer.style.display = which === 'forgot' ? 'block' : 'none';
+    }
+
+    function resetOtpInputs(focusFirst = true) {
+        const inputs = document.querySelectorAll('.otp-input');
+        inputs.forEach(input => input.value = '');
+        if (focusFirst && inputs.length) inputs[0].focus();
+    }
+
+    function open2FAScreen(state, { autoCooldown = true } = {}) {
+        const ui = ROLE_UI[state.role] || ROLE_UI.admin;
+        const icon = document.getElementById('otpRoleIcon');
+        const title = document.getElementById('otpRoleTitle');
+        const emailText = document.getElementById('otpSentEmail');
+        const verifyBtn = document.getElementById('verifyOtpBtn');
+        if (icon) { icon.className = ui.icon; icon.style.color = ui.iconColor; }
+        if (title) title.textContent = ui.title;
+        if (emailText) emailText.textContent = state.email || '';
+        if (verifyBtn) verifyBtn.style.background = ui.buttonBg;
+        resetOtpInputs();
+        showScreen('otp');
+        if (autoCooldown) startResendCooldown();
+    }
     
+    // Auth state observer — drives redirects AND restores an in-progress 2FA challenge
+    auth.onAuthStateChanged(async (user) => {
+        if (!user) {
+            clearPending2FA();
+            if (window.location.pathname === '/') showScreen('roles');
+            return;
+        }
+        if (window.location.pathname !== '/') return;
+
+        const pending = readPending2FA();
+        if (pending && pending.uid === user.uid) {
+            // Page reloaded mid-challenge — restore the OTP screen (no duplicate e-mail)
+            open2FAScreen(pending, { autoCooldown: false });
+            return;
+        }
+        if (pending && pending.uid !== user.uid) clearPending2FA();
+
+        // Already fully verified in this tab -> straight to the dashboard.
+        // The default/Master Admin account is exempt from 2FA entirely.
+        if (!is2FAVerified(user.uid) && String(user.email || '').toLowerCase() !== DEFAULT_ADMIN_EMAIL) {
+            return; // admin/staff must finish 2FA first (dashboards enforce this too)
+        }
+
+        try {
+            const userSnap = await get(ref(db, 'users/' + user.uid));
+            if (userSnap.exists()) {
+                const role = userSnap.val().role;
+                localStorage.setItem('userRole', role);
+                if (role === 'admin') window.location.href = '/admin';
+                else if (role === 'employee') window.location.href = '/employee';
+                else window.location.href = '/senior';
+            }
+        } catch (err) {
+            console.error("Auth check redirect error:", err);
+        }
+    });
+
+    // Clear login credentials if navigated via back button
+    window.addEventListener('pageshow', () => {
+        if (loginForm) {
+            loginForm.reset();
+            const emailInput = document.getElementById('email');
+            const passInput = document.getElementById('password');
+            if (emailInput) emailInput.value = '';
+            if (passInput) passInput.value = '';
+        }
+    });
+
     if (loginForm) {
         loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -18,28 +162,8 @@ document.addEventListener('DOMContentLoaded', () => {
             btn.disabled = true;
 
             try {
-                let userCredential;
-                // Special Rule: Setup Master Admin Account on first try
-                if (email === 'admin@silvercare.com') {
-                    try {
-                        userCredential = await signInWithEmailAndPassword(auth, email, password);
-                    } catch (err) {
-                        if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential' || err.code === 'auth/invalid-login-credentials') {
-                            userCredential = await createUserWithEmailAndPassword(auth, email, password);
-                            await set(ref(db, 'users/' + userCredential.user.uid), {
-                                email: email,
-                                role: 'admin',
-                                status: 'Active',
-                                name: 'Master Admin'
-                            });
-                        } else {
-                            throw err;
-                        }
-                    }
-                } else {
-                    // Standard Login
-                    userCredential = await signInWithEmailAndPassword(auth, email, password);
-                }
+                // Standard Login for all users
+                const userCredential = await signInWithEmailAndPassword(auth, email, password);
 
                 const user = userCredential.user;
 
@@ -68,7 +192,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     if (userData.status !== 'Active') {
                         await auth.signOut();
-                        scNotify('error', 'Your account is currently inactive. Please contact an administrator.', 'Account Inactive');
+                        const isInactiveSenior = (userData.role === 'senior') && ((userData.status || '') === 'Inactive' || (userData.lifeStatus || '') === 'Inactive');
+                        scNotify('error', isInactiveSenior
+                            ? 'Your account is currently inactive. You can reactivate it yourself with a face scan — choose "Account inactive? Reactivate with Face Scan" on the Senior login screen, or visit the OSCA office.'
+                            : 'Your account is currently inactive. Please contact an administrator.', 'Account Inactive');
                         btn.innerHTML = originalText;
                         btn.disabled = false;
                         return;
@@ -88,6 +215,83 @@ document.addEventListener('DOMContentLoaded', () => {
                             return;
                         }
                     }
+
+                    // --- Default/Master Admin exemption: sign straight in, no OTP ---
+                    if ((userData.email || '').toLowerCase() === DEFAULT_ADMIN_EMAIL) {
+                        sessionStorage.removeItem(VERIFIED_KEY);
+                        clearPending2FA();
+
+                        // Reset login form fields before redirecting
+                        const masterEmailInput = document.getElementById('email');
+                        const masterPassInput = document.getElementById('password');
+                        if (masterEmailInput) masterEmailInput.value = '';
+                        if (masterPassInput) masterPassInput.value = '';
+                        if (loginForm) loginForm.reset();
+
+                        window.location.href = '/admin';
+                        return;
+                    }
+
+                    // --- Two-Factor Authentication gate (Admin & OSCA Staff only) ---
+                    if (userData.role === 'admin' || userData.role === 'employee') {
+                        // Every fresh login must pass a brand-new OTP challenge
+                        sessionStorage.removeItem(VERIFIED_KEY);
+                        clearPending2FA();
+
+                        try {
+                            const token = await user.getIdToken();
+                            const startRes = await fetch('/api/2fa/start', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token }
+                            });
+                            const startData = await startRes.json().catch(() => ({}));
+
+                            if (!startRes.ok && startRes.status !== 429) {
+                                // Could not e-mail the OTP — refuse the login (no OTP, no login)
+                                await auth.signOut();
+                                localStorage.removeItem('userRole');
+                                scNotify('error', startData.message || 'Failed to send the security code to your email. Please try again.', '2FA Required');
+                                btn.innerHTML = originalText;
+                                btn.disabled = false;
+                                return;
+                            }
+
+                            // OTP e-mailed (or a resend is still cooling down) — open the 2FA screen
+                            const pendingState = { uid: user.uid, role: userData.role, email: userData.email || email };
+                            writePending2FA(pendingState);
+
+                            // Reset login form fields before switching screens
+                            const emailInput = document.getElementById('email');
+                            const passInput = document.getElementById('password');
+                            if (emailInput) emailInput.value = '';
+                            if (passInput) passInput.value = '';
+                            if (loginForm) loginForm.reset();
+
+                            open2FAScreen(pendingState);
+                            if (startRes.status === 429) {
+                                scNotify('warning', startData.message || 'A code was just sent. Please wait before requesting another.', 'Code Already Sent');
+                            }
+                            btn.innerHTML = originalText;
+                            btn.disabled = false;
+                            return; // Stay here until the OTP is verified
+                        } catch (err) {
+                            console.error('2FA start error:', err);
+                            await auth.signOut();
+                            localStorage.removeItem('userRole');
+                            scNotify('error', 'Failed to start two-factor authentication. Please try again.', '2FA Required');
+                            btn.innerHTML = originalText;
+                            btn.disabled = false;
+                            return;
+                        }
+                    }
+
+                    // Seniors: simplified login (no 2FA, per panel requirement)
+                    // Reset login form fields before redirecting
+                    const emailInput = document.getElementById('email');
+                    const passInput = document.getElementById('password');
+                    if (emailInput) emailInput.value = '';
+                    if (passInput) passInput.value = '';
+                    if (loginForm) loginForm.reset();
 
                     // Redirect based on role
                     if (userData.role === 'admin') window.location.href = '/admin';
@@ -121,15 +325,185 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // --- 2FA OTP input behavior: auto-advance, backspace, paste, enter ---
+    const otpForm = document.getElementById('otpForm');
+    const otpGroup = document.querySelector('.otp-group');
+    const otpInputs = Array.from(document.querySelectorAll('.otp-input'));
+
+    // Clicking anywhere in the pill focuses the first EMPTY slot so digits
+    // never land mid-string — keeps the code perfectly centered as a group.
+    if (otpGroup) {
+        otpGroup.addEventListener('click', (e) => {
+            if (e.target.classList && e.target.classList.contains('otp-input')) return;
+            const firstEmpty = otpInputs.find(i => !i.value) || otpInputs[otpInputs.length - 1];
+            if (firstEmpty) firstEmpty.focus();
+        });
+    }
+
+    otpInputs.forEach((input, index) => {
+        input.addEventListener('input', () => {
+            input.value = input.value.replace(/\D/g, '').slice(-1);
+            if (input.value && index < otpInputs.length - 1) otpInputs[index + 1].focus();
+        });
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Backspace' && !input.value && index > 0) otpInputs[index - 1].focus();
+            if (e.key === 'Enter' && otpForm) otpForm.requestSubmit();
+        });
+        input.addEventListener('paste', (e) => {
+            e.preventDefault();
+            const digits = (e.clipboardData.getData('text') || '').replace(/\D/g, '').slice(0, otpInputs.length);
+            digits.split('').forEach((d, i) => { otpInputs[i].value = d; });
+            otpInputs[Math.min(digits.length, otpInputs.length - 1)].focus();
+        });
+    });
+
+    // --- 2FA: Verify & Login ---
+    if (otpForm) {
+        otpForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const verifyBtn = document.getElementById('verifyOtpBtn');
+            const code = otpInputs.map(i => i.value).join('');
+            if (!/^\d{6}$/.test(code)) {
+                scNotify('warning', 'Enter the complete 6-digit code sent to your email.', 'Incomplete Code');
+                return;
+            }
+            const originalText = verifyBtn.innerHTML;
+            verifyBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verifying...';
+            verifyBtn.disabled = true;
+            try {
+                const token = await auth.currentUser.getIdToken();
+                const res = await fetch('/api/2fa/verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+                    body: JSON.stringify({ code })
+                });
+                const data = await res.json().catch(() => ({}));
+                if (data.success) {
+                    // OTP accepted — unlock the dashboard for this tab
+                    const pending = readPending2FA();
+                    const uid = pending ? pending.uid : (auth.currentUser ? auth.currentUser.uid : '');
+                    sessionStorage.setItem(VERIFIED_KEY, uid);
+                    clearPending2FA();
+                    const role = (pending && pending.role) || localStorage.getItem('userRole');
+                    if (role === 'admin') window.location.href = '/admin';
+                    else if (role === 'employee') window.location.href = '/employee';
+                    else window.location.href = '/';
+                } else {
+                    scNotify('error', data.message || 'Invalid security code.', 'Verification Failed');
+                    resetOtpInputs();
+                    verifyBtn.innerHTML = originalText;
+                    verifyBtn.disabled = false;
+                }
+            } catch (err) {
+                console.error('2FA verify error:', err);
+                scNotify('error', 'Verification failed. Please try again.', 'Verification Failed');
+                verifyBtn.innerHTML = originalText;
+                verifyBtn.disabled = false;
+            }
+        });
+    }
+
+    // --- 2FA: Resend code (server enforces a 30s cooldown) ---
+    const resendLink = document.getElementById('resendOtpLink');
+    if (resendLink) {
+        resendLink.addEventListener('click', async (e) => {
+            e.preventDefault();
+            const pending = readPending2FA();
+            const currentUser = auth.currentUser;
+            if (!pending || !currentUser) return;
+            try {
+                const token = await currentUser.getIdToken();
+                const res = await fetch('/api/2fa/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token }
+                });
+                const data = await res.json().catch(() => ({}));
+                if (data.success) {
+                    scNotify('success', data.message || 'A new security code was sent to your email.', 'Code Sent');
+                    startResendCooldown();
+                    resetOtpInputs();
+                } else {
+                    scNotify('warning', data.message || 'Please wait before requesting a new code.', 'Please Wait');
+                    startResendCooldown();
+                }
+            } catch (err) {
+                console.error('2FA resend error:', err);
+                scNotify('error', 'Failed to resend the code. Please try again.', 'Error');
+            }
+        });
+    }
+
+    // --- 2FA: Back to role selection (aborts the challenge) ---
+    const otpBackBtn = document.getElementById('otpBackBtn');
+    if (otpBackBtn) {
+        otpBackBtn.addEventListener('click', async () => {
+            clearPending2FA();
+            try { await auth.signOut(); } catch (err) { console.error(err); }
+            showScreen('roles');
+        });
+    }
+
+    // --- Forgot Password (Admin accounts): request a reset link ---
+    const forgotPwLink = document.getElementById('forgotPwLink');
+    const forgotPwForm = document.getElementById('forgotPwForm');
+    const forgotPwBackBtn = document.getElementById('forgotPwBackBtn');
+
+    if (forgotPwLink) {
+        forgotPwLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            const loginEmail = document.getElementById('email');
+            const forgotEmail = document.getElementById('forgotPwEmail');
+            if (loginEmail && forgotEmail && loginEmail.value) forgotEmail.value = loginEmail.value.trim();
+            showScreen('forgot');
+        });
+    }
+
+    if (forgotPwBackBtn) {
+        forgotPwBackBtn.addEventListener('click', () => showScreen('roles'));
+    }
+
+    if (forgotPwForm) {
+        forgotPwForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('forgotPwEmail').value.trim();
+            const sendBtn = document.getElementById('sendResetBtn');
+            const originalText = sendBtn.innerHTML;
+            sendBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+            sendBtn.disabled = true;
+            try {
+                const res = await fetch('/api/forgot-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email })
+                });
+                const data = await res.json().catch(() => ({}));
+                if (data.success) {
+                    scNotify('success', data.message, 'Check Your Email');
+                    showScreen('roles');
+                } else {
+                    scNotify('warning', data.message || 'Please try again.', 'Reset Link');
+                }
+            } catch (err) {
+                console.error('Forgot password error:', err);
+                scNotify('error', 'Failed to send the reset link. Please try again.', 'Error');
+            } finally {
+                sendBtn.innerHTML = originalText;
+                sendBtn.disabled = false;
+            }
+        });
+    }
+
     // Handle logout
     const logoutBtn = document.getElementById('logoutBtn');
     if (logoutBtn) {
         logoutBtn.addEventListener('click', async (e) => {
             e.preventDefault();
             try {
+                sessionStorage.removeItem(VERIFIED_KEY);
+                clearPending2FA();
                 await auth.signOut();
                 localStorage.removeItem('userRole');
-                window.location.href = '/';
+                window.location.replace('/');
             } catch (err) {
                 scNotify('error', 'Failed to log out. Please try again.', 'Logout Error');
             }

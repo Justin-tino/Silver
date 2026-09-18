@@ -49,11 +49,14 @@ async function createDefaultAdmin() {
         if (existingUid) {
             console.log(`User ${DEFAULT_ADMIN.email} already exists with uid: ${existingUid}`);
             
-            // Update Firebase Auth email verified status
+            // Update Firebase Auth: mark verified and reset password to the
+            // default so the documented credentials (admin@silvercare.com /
+            // admin123) always work when this script runs.
             await auth.updateUser(existingUid, {
-                emailVerified: true
+                emailVerified: true,
+                password: DEFAULT_ADMIN.password
             });
-            console.log('Email verified status updated in Firebase Auth');
+            console.log('Email verified status updated and password reset to default in Firebase Auth');
 
             // Update role to admin if not already
             const userRef = db.ref(`users/${existingUid}`);

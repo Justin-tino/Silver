@@ -1,0 +1,79 @@
+/* Process Benefits — fixed layout: full-width pension, 2-col assistance.
+   Every content container scrolls INSIDE its own card so nothing can bleed
+   into a neighbour column. All original IDs unchanged. */
+.pb-ledger { background: #fff; border: 2px solid #111827; border-radius: 10px; overflow: hidden; max-width: 100%; }
+.pb-ledger-toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; padding: 20px 24px 14px; }
+.pb-ledger-title h3 { margin: 0; color: #1e293b; font-size: 1.15rem; font-weight: 700; }
+.pb-ledger-title p { margin: 6px 0 0; color: #52525b; font-size: 0.85rem; }
+.pb-ledger-tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.pb-search { min-width: 220px; padding: 9px 12px 9px 34px; border: 1.5px solid #d4d4d8; border-radius: 6px; font-size: 0.85rem; outline: none; background: #fff url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="%2371717a" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>') no-repeat 11px center; }
+.pb-search:focus { border-color: #1e293b; }
+.pb-btn { border: 1.5px solid #1e293b; background: #fff; color: #1e293b; padding: 8px 14px; border-radius: 6px; font-size: 0.82rem; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.pb-btn:hover { background: #1e293b; color: #fff; }
+.pb-btn-dark { background: #1e293b; color: #fff; }
+.pb-stat-strip { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 2px solid #111827; border-bottom: 2px solid #111827; background: #fafafa; margin-bottom: 20px; }
+.pb-stat-strip > div { padding: 12px 16px; text-align: center; border-left: 2px solid #111827; }
+.pb-stat-strip > div:first-child { border-left: none; }
+.pb-stat-strip b { display: block; font-size: 1.25rem; color: #111827; }
+.pb-stat-strip span { font-size: 0.72rem; font-weight: 700; color: #52525b; text-transform: uppercase; letter-spacing: 0.04em; }
+.pb-head-row { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; background: #fff; border-bottom: 2px solid #111827; text-align: center; }
+.pb-head-cell { padding: 16px 10px; font-weight: 700; font-size: 0.92rem; color: #111827; border-left: 2px solid #111827; display: flex; align-items: center; justify-content: center; gap: 8px; }
+.pb-head-cell:first-child { border-left: none; }
+.pb-head-cell.span2 { grid-column: span 2; }
+.pb-count { background: #111827; color: #fff; font-size: 0.72rem; font-weight: 700; padding: 1px 8px; border-radius: 999px; min-width: 22px; display: inline-block; text-align: center; }
+
+/* Section shell: one bordered card per workflow stage */
+.pb-section { margin: 0 24px 20px; border: 1.5px solid #111827; border-radius: 8px; overflow: hidden; background: #fff; }
+.pb-section-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 13px 18px; background: #f8fafc; border-bottom: 1.5px solid #111827; font-weight: 700; color: #111827; font-size: 0.92rem; }
+.pb-section-head .pb-sub { font-weight: 500; font-size: 0.76rem; color: #64748b; display: block; margin-top: 2px; }
+.pb-section-body { padding: 14px 16px; }
+
+/* Pension tables live full-width so 6-7 columns never squeeze */
+.pb-wide-table { overflow-x: auto; overflow-y: auto; max-height: 380px; border: 1px solid #e4e4e7; border-radius: 6px; background: #fff; }
+.pb-wide-table table { min-width: 860px; width: 100%; }
+.pb-wide-table table th { position: sticky; top: 0; background: #f8fafc; z-index: 1; white-space: nowrap; }
+.pb-wide-table table td { vertical-align: middle; word-break: break-word; }
+
+/* Assistance: two cards side by side, each scrolls internally */
+.pb-split { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 0 24px 20px; }
+.pb-card { border: 1.5px solid #111827; border-radius: 8px; overflow: hidden; background: #fff; display: flex; flex-direction: column; min-width: 0; }
+.pb-card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 13px 18px; background: #f8fafc; border-bottom: 1.5px solid #111827; font-weight: 700; color: #111827; font-size: 0.9rem; }
+.pb-card-body { padding: 14px; overflow-y: auto; overflow-x: hidden; max-height: 480px; min-height: 180px; }
+.pb-subhead { font-size: 0.82rem; font-weight: 700; color: #1e293b; margin: 0 0 10px; padding-bottom: 8px; border-bottom: 1px solid #e4e4e7; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.pb-subhead .pb-mini { font-size: 0.7rem; font-weight: 600; color: #71717a; }
+.pb-foot-row { border-top: 2px solid #111827; background: #fff; }
+.pb-foot-head { width: 100%; background: #fff; border: none; padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; gap: 10px; cursor: pointer; font-weight: 700; color: #111827; font-size: 0.92rem; text-align: left; }
+.pb-foot-head:hover { background: #fafafa; }
+.pb-foot-body { padding: 0 24px 22px; }
+/* Pension tables: keep native table width but never bleed — scroll inside card */
+#pensionSetupContainer.pb-wide-table table,
+#pensionConfiguredContainer.pb-wide-table table { min-width: 760px; width: 100%; }
+#pensionSetupContainer.pb-wide-table,
+#pensionConfiguredContainer.pb-wide-table { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+#pensionSetupContainer.pb-wide-table input[type="number"] { max-width: 100%; }
+/* Claimed pension cards + claim cards: never overflow their own column */
+#pensionClaimedContainer > div,
+#claimsPayoutContainer > div,
+#claimsClaimedContainer > div,
+#claimsListContainer > div { max-width: 100%; box-sizing: border-box; }
+#pensionClaimedContainer [data-pb-searchable] { overflow-wrap: anywhere; }
+/* History table scrolls horizontally inside its section on narrow screens */
+#claimsHistoryContainer { overflow-x: auto; }
+#claimsHistoryContainer table { min-width: 720px; }
+#pensionSetupBadge { background: #111827; color: #fff; padding: 1px 8px; border-radius: 999px; font-size: 0.72rem; font-weight: 700; margin-left: 6px; }
+
+@media (max-width: 1100px) {
+  .pb-stat-strip { grid-template-columns: 1fr 1fr; }
+  .pb-stat-strip > div:nth-child(3) { border-left: none; }
+  .pb-split { grid-template-columns: 1fr; }
+  .pb-section { margin: 0 14px 14px; }
+  .pb-split { margin: 0 14px 14px; }
+}
+@media (max-width: 640px) {
+  .pb-stat-strip { grid-template-columns: 1fr; }
+  .pb-stat-strip > div { border-left: none; }
+  .pb-ledger-toolbar { padding: 16px; }
+}
+/* Legacy 4-col grid from the first draft — removed from markup, hidden as safety */
+.pb-head-row, .pb-head-cell, .pb-body-row, .pb-col { display: none; }
+.pb-mini { font-size: 0.7rem; font-weight: 600; color: #71717a; }

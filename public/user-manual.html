@@ -1,0 +1,488 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SilverCare User Manual &mdash; OSCA Magalang</title>
+    <link rel="icon" type="image/png" href="images/logo.png">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root { --green: #059669; --green-dark: #065f46; --dark: #1e293b; --muted: #64748b; --border: #e2e8f0; --soft: #f8fafc; }
+        * { box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
+        body { margin: 0; font-family: 'Inter', Arial, sans-serif; color: var(--dark); background: #f1f5f9; line-height: 1.7; font-size: 17px; }
+        @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } * { animation: none !important; transition: none !important; } }
+        #progressBar { position: fixed; top: 0; left: 0; height: 4px; width: 0%; background: linear-gradient(90deg, #34d399, #059669); z-index: 1002; transition: width 0.15s ease-out; }
+        .skip-link { position: absolute; left: -9999px; top: 0; background: #fff; color: var(--green-dark); padding: 10px 18px; border-radius: 0 0 10px 0; z-index: 1003; font-weight: 700; }
+        .skip-link:focus { left: 0; }
+        .manual-top { background: linear-gradient(135deg, #065f46, #059669); color: #fff; padding: 34px 22px 30px; text-align: center; }
+        .manual-top h1 { margin: 10px 0 4px; font-size: 1.9rem; letter-spacing: -0.3px; }
+        .manual-top p { margin: 0; opacity: 0.92; font-size: 1.05rem; }
+        .manual-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 18px; }
+        .manual-actions a, .manual-actions button { display: inline-flex; align-items: center; gap: 8px; padding: 12px 22px; border-radius: 10px; font-weight: 700; font-size: 1rem; text-decoration: none; cursor: pointer; border: none; }
+        .btn-print { background: #fff; color: #065f46; }
+        .btn-back { background: rgba(255,255,255,0.2); color: #fff; border: 1px solid rgba(255,255,255,0.5); }
+        .btn-back:hover, .btn-print:hover { filter: brightness(0.97); }
+        .manual-shell { max-width: 1200px; margin: 0 auto; padding: 26px 18px 90px; display: flex; gap: 26px; align-items: flex-start; }
+        .manual-sidebar { width: 290px; flex-shrink: 0; position: sticky; top: 18px; display: flex; flex-direction: column; gap: 14px; }
+        .manual-content { flex: 1; min-width: 0; }
+        .nav-card { background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 16px; }
+        .nav-card h2 { margin: 0 0 10px; font-size: 1.02rem; display: flex; align-items: center; gap: 8px; }
+        .nav-search { width: 100%; padding: 11px 14px; border: 1.5px solid #cbd5e1; border-radius: 10px; font-size: 0.95rem; font-family: inherit; outline: none; }
+        .nav-search:focus { border-color: var(--green); }
+        .nav-list { list-style: none; margin: 12px 0 0; padding: 0; max-height: 62vh; overflow-y: auto; }
+        .nav-list a { display: flex; align-items: baseline; gap: 9px; padding: 8px 10px; border-radius: 9px; color: #334155; font-weight: 600; font-size: 0.9rem; text-decoration: none; transition: background 0.15s; }
+        .nav-list a:hover { background: #f1f5f9; }
+        .nav-list a.active { background: #ecfdf5; color: var(--green-dark); }
+        .nav-num { flex-shrink: 0; width: 22px; height: 22px; border-radius: 50%; background: #f1f5f9; color: #475569; font-size: 0.72rem; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; align-self: center; }
+        .nav-list a.active .nav-num { background: var(--green); color: #fff; }
+        .nav-empty { display: none; color: #94a3b8; font-size: 0.85rem; padding: 10px; }
+        .help-card { background: linear-gradient(135deg, #065f46, #059669); color: #fff; border-radius: 14px; padding: 18px; }
+        .help-card h2 { margin: 0 0 8px; font-size: 1rem; display: flex; align-items: center; gap: 8px; }
+        .help-card p { margin: 0 0 4px; font-size: 0.88rem; opacity: 0.94; }
+        .help-card strong { color: #fff; }
+        .nav-toggle { display: none; width: 100%; padding: 14px 18px; background: #fff; color: var(--green-dark); font-weight: 700; font-size: 1rem; border: 1px solid var(--border); border-radius: 12px; cursor: pointer; align-items: center; justify-content: space-between; }
+        .nav-toggle i.chev { transition: transform 0.2s; }
+        .nav-toggle[aria-expanded="true"] i.chev { transform: rotate(180deg); }
+        .manual-section { background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 26px 30px; margin-bottom: 20px; scroll-margin-top: 18px; }
+        .sec-kicker { display: block; font-size: 0.75rem; font-weight: 800; letter-spacing: 1.2px; text-transform: uppercase; color: var(--green); margin-bottom: 4px; }
+        .manual-section h2 { margin: 0 0 12px; font-size: 1.4rem; color: var(--green-dark); line-height: 1.3; }
+        .manual-section h2 i { margin-right: 10px; }
+        .manual-section h3 { margin: 20px 0 8px; font-size: 1.08rem; color: var(--dark); }
+        .manual-section p, .manual-section li { color: #334155; }
+        .lead { font-size: 1.02rem; color: #475569; margin-top: 0; }
+        .steps { list-style: none; margin: 14px 0 6px; padding: 0; }
+        .steps li { position: relative; padding: 0 0 18px 52px; }
+        .steps li::before { content: ""; position: absolute; left: 16px; top: 26px; bottom: -2px; width: 2px; background: #e2e8f0; }
+        .steps li:last-child { padding-bottom: 4px; }
+        .steps li:last-child::before { display: none; }
+        .steps li::after { content: attr(data-step); position: absolute; left: 0; top: 0; width: 33px; height: 33px; border-radius: 50%; background: #ecfdf5; border: 2px solid var(--green); color: var(--green-dark); font-weight: 800; font-size: 0.9rem; display: flex; align-items: center; justify-content: center; }
+        .steps li strong { color: var(--dark); }
+        .steps li .sub { display: block; font-size: 0.88rem; color: var(--muted); margin-top: 3px; }
+        .checklist { list-style: none; margin: 10px 0 4px; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+        .checklist li { display: flex; align-items: flex-start; gap: 10px; background: var(--soft); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; font-size: 0.95rem; }
+        .checklist li i { color: var(--green); margin-top: 4px; }
+        .kbd { background: #f1f5f9; border: 1px solid #cbd5e1; border-bottom-width: 2px; border-radius: 6px; padding: 1px 7px; font-size: 0.85em; font-weight: 700; color: #334155; }
+        .tip, .info, .warn { border-radius: 12px; padding: 14px 18px; margin: 16px 0 4px; font-size: 0.95rem; display: flex; gap: 12px; align-items: flex-start; }
+        .tip { background: #ecfdf5; border: 1px solid #6ee7b7; color: #065f46; }
+        .info { background: #eff6ff; border: 1px solid #93c5fd; color: #1e40af; }
+        .warn { background: #fffbeb; border: 1px solid #fcd34d; color: #92400e; }
+        .tip i, .info i, .warn i { margin-top: 3px; font-size: 1.05rem; flex-shrink: 0; }
+        .quick-start { background: linear-gradient(135deg, #064e3b, #059669); color: #fff; border-radius: 14px; padding: 24px 26px; margin-bottom: 20px; }
+        .quick-start h2 { margin: 0 0 6px; font-size: 1.25rem; display: flex; align-items: center; gap: 10px; }
+        .quick-start > p { margin: 0 0 14px; opacity: 0.94; font-size: 0.95rem; }
+        .qs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+        .qs-item { background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.25); border-radius: 12px; padding: 14px 16px; display: flex; gap: 12px; align-items: flex-start; }
+        .qs-item i { font-size: 1.2rem; margin-top: 3px; }
+        .qs-item b { display: block; font-size: 0.98rem; }
+        .qs-item span { font-size: 0.85rem; opacity: 0.9; }
+        .tab-ref { list-style: none; margin: 12px 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 10px; }
+        .tab-ref li { border: 1px solid var(--border); background: var(--soft); border-radius: 10px; padding: 12px 14px; }
+        .tab-ref b { display: flex; align-items: center; gap: 8px; color: var(--green-dark); }
+        .tab-ref b i { width: 18px; text-align: center; }
+        .tab-ref span { display: block; font-size: 0.88rem; color: #475569; margin-top: 3px; }
+        .glossary { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 10px; margin: 12px 0 4px; }
+        .glossary div { background: var(--soft); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; font-size: 0.92rem; }
+        .glossary dt { font-weight: 800; color: var(--green-dark); margin-bottom: 2px; }
+        .glossary dd { margin: 0; color: #475569; }
+        .faq { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+        .faq details { border-bottom: 1px solid var(--border); }
+        .faq details:last-child { border-bottom: none; }
+        .faq summary { list-style: none; cursor: pointer; padding: 15px 18px; font-weight: 700; color: var(--dark); display: flex; align-items: center; gap: 10px; }
+        .faq summary::-webkit-details-marker { display: none; }
+        .faq summary::before { content: "\f105"; font-family: "Font Awesome 6 Free"; font-weight: 900; color: var(--green); transition: transform 0.2s; }
+        .faq details[open] summary::before { transform: rotate(90deg); }
+        .faq .faq-a { padding: 0 18px 16px 40px; color: #334155; font-size: 0.95rem; }
+        .faq .faq-a p { margin: 0 0 8px; }
+        .manual-footer { text-align: center; color: var(--muted); font-size: 0.88rem; padding: 8px 0 0; }
+        .manual-footer .doc-meta { display: inline-flex; gap: 14px; flex-wrap: wrap; justify-content: center; margin-bottom: 6px; }
+        #backTop { position: fixed; right: 18px; bottom: 18px; width: 46px; height: 46px; border-radius: 50%; border: none; background: var(--green); color: #fff; font-size: 1.05rem; cursor: pointer; box-shadow: 0 6px 18px rgba(5,150,105,0.35); opacity: 0; pointer-events: none; transition: opacity 0.2s; z-index: 1001; }
+        #backTop.show { opacity: 1; pointer-events: auto; }
+        #backTop:hover { filter: brightness(1.08); }
+        @media (max-width: 980px) {
+            .manual-shell { flex-direction: column; }
+            .manual-sidebar { width: 100%; position: static; }
+            .nav-toggle { display: flex; }
+            .nav-card { display: none; }
+            .nav-card.open { display: block; margin-top: 10px; }
+            .nav-list { max-height: 46vh; }
+            .help-card { display: none; }
+            .manual-section { padding: 20px 18px; }
+        }
+        @media print {
+            body { background: #fff; font-size: 13px; }
+            #progressBar, #backTop, .manual-actions, .no-print { display: none !important; }
+            .manual-top { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .manual-shell { display: block; max-width: 100%; padding: 0; }
+            .manual-sidebar, .nav-toggle { display: none !important; }
+            .manual-section { break-inside: avoid; border: 1px solid #ccc; box-shadow: none; }
+            .quick-start { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .faq details { break-inside: avoid; }
+            .faq .faq-a { display: block !important; }
+        }
+    </style>
+</head>
+<body>
+    <div id="progressBar" aria-hidden="true"></div>
+    <a class="skip-link" href="#content">Skip to main content</a>
+
+    <header class="manual-top">
+        <img src="images/logo.png" alt="SilverCare" onerror="this.onerror=null; this.replaceWith(Object.assign(document.createElement('div'), {textContent:'\uD83D\uDC31', style:'width:72px;height:72px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;font-size:2.2rem;margin:0 auto;'}))" style="width:72px; height:72px; border-radius:50%; object-fit:cover; border:3px solid rgba(255,255,255,0.6);">
+        <h1>SilverCare User Manual</h1>
+        <p>OSCA Magalang &middot; Senior Citizen Benefits &amp; Health Records System</p>
+        <div class="manual-actions no-print">
+            <button class="btn-print" onclick="window.print()"><i class="fas fa-print"></i> Print / Save as PDF</button>
+            <a class="btn-back" href="/"><i class="fas fa-home"></i> Back to Home</a>
+        </div>
+    </header>
+
+    <div class="manual-shell">
+        <!-- Sidebar navigation -->
+        <aside class="manual-sidebar no-print" aria-label="Manual navigation">
+            <button class="nav-toggle" id="navToggle" aria-expanded="false" aria-controls="navCard">
+                <span><i class="fas fa-list-ul"></i>&nbsp; Manual contents</span>
+                <i class="fas fa-chevron-down chev"></i>
+            </button>
+            <nav class="nav-card" id="navCard">
+                <h2><i class="fas fa-list-ul"></i> Contents</h2>
+                <input type="search" id="navSearch" class="nav-search" placeholder="Search this manual..." aria-label="Search manual sections">
+                <ul class="nav-list" id="navList">
+                    <li><a href="#m-what"><span class="nav-num">1</span> What is SilverCare?</a></li>
+                    <li><a href="#m-account"><span class="nav-num">2</span> Creating your account</a></li>
+                    <li><a href="#m-login"><span class="nav-num">3</span> Logging in</a></li>
+                    <li><a href="#m-dashboard"><span class="nav-num">4</span> Your dashboard &amp; tabs</a></li>
+                    <li><a href="#m-verify"><span class="nav-num">5</span> Getting verified (KYC)</a></li>
+                    <li><a href="#m-benefits"><span class="nav-num">6</span> Assistance &amp; pension</a></li>
+                    <li><a href="#m-qr"><span class="nav-num">7</span> Your QR digital ID</a></li>
+                    <li><a href="#m-appt"><span class="nav-num">8</span> Appointments &amp; queue numbers</a></li>
+                    <li><a href="#m-meds"><span class="nav-num">9</span> Medication reminders &amp; refills</a></li>
+                    <li><a href="#m-notif"><span class="nav-num">10</span> Notifications</a></li>
+                    <li><a href="#m-react"><span class="nav-num">11</span> Reactivating an inactive account</a></li>
+                    <li><a href="#m-safe"><span class="nav-num">12</span> Safety &amp; your privacy</a></li>
+                    <li><a href="#m-words"><span class="nav-num">13</span> Words you may see</a></li>
+                    <li><a href="#m-faq"><span class="nav-num">14</span> Common questions</a></li>
+                    <li><a href="#m-help"><span class="nav-num">15</span> Getting help</a></li>
+                </ul>
+                <p class="nav-empty" id="navEmpty">No matching section found.</p>
+            </nav>
+            <div class="help-card">
+                <h2><i class="fas fa-circle-info"></i> Need help?</h2>
+                <p>Visit the <strong>OSCA Office, Municipality of Magalang, Pampanga</strong>.</p>
+                <p>Or ask at your <strong>barangay health center</strong>. Bring your Senior Citizen ID.</p>
+            </div>
+        </aside>
+
+        <!-- Main content -->
+        <main class="manual-content" id="content">
+            <div class="quick-start">
+                <h2><i class="fas fa-bolt"></i> New here? Start with these 4 steps</h2>
+                <p>Most seniors finish everything in one visit to the OSCA office &mdash; staff are happy to help.</p>
+                <div class="qs-grid">
+                    <div class="qs-item"><i class="fas fa-user-plus"></i><div><b>1. Create your account</b><span>Register with your Senior Citizen ID details</span></div></div>
+                    <div class="qs-item"><i class="fas fa-user-shield"></i><div><b>2. Get verified</b><span>Upload your ID and take a selfie</span></div></div>
+                    <div class="qs-item"><i class="fas fa-hand-holding-heart"></i><div><b>3. Apply for benefits</b><span>Burial or bedridden assistance, pension</span></div></div>
+                    <div class="qs-item"><i class="fas fa-calendar-check"></i><div><b>4. Book an appointment</b><span>Pick a schedule and get your queue number</span></div></div>
+                </div>
+            </div>
+            <div class="manual-section" id="m-what">
+                <span class="sec-kicker">Section 1 of 15</span>
+                <h2><i class="fas fa-heart"></i>What is SilverCare?</h2>
+                <p class="lead">SilverCare is the online system of the <strong>Office of the Senior Citizens Affairs (OSCA) of Magalang, Pampanga</strong>. It helps senior citizens:</p>
+                <ul>
+                    <li>Apply for burial and bedridden assistance, and track monthly pension</li>
+                    <li>Book OSCA visits online and get a queue number</li>
+                    <li>Keep health records with affiliated barangay health centers</li>
+                    <li>Receive reminders and announcements from OSCA staff</li>
+                </ul>
+                <div class="tip"><i class="fas fa-lightbulb"></i><span><strong>Tip:</strong> If the text on the screen is too small, hold the <span class="kbd">Ctrl</span> key and press <span class="kbd">+</span> to make everything bigger.</span></div>
+            </div>
+
+            <div class="manual-section" id="m-account">
+                <span class="sec-kicker">Section 2 of 15</span>
+                <h2><i class="fas fa-user-plus"></i>Creating your account</h2>
+                <p class="lead">Creating an account is free and only needs to be done once. Before you start, prepare:</p>
+                <ul class="checklist">
+                    <li><i class="fas fa-circle-check"></i><span>Your <strong>Senior Citizen ID</strong> details (name, birthdate, address)</span></li>
+                    <li><i class="fas fa-circle-check"></i><span>An <strong>email address</strong> you can open</span></li>
+                    <li><i class="fas fa-circle-check"></i><span>A phone or computer with a <strong>camera</strong></span></li>
+                </ul>
+                <ol class="steps">
+                    <li data-step="1">Go to the SilverCare home page and click <strong>Create an Account</strong>.</li>
+                    <li data-step="2">Choose <strong>Senior Citizen</strong> and fill in your name, birthdate, address, and contact details.</li>
+                    <li data-step="3">Type your <strong>email address</strong> and a <strong>password</strong> you will remember.</li>
+                    <li data-step="4">When asked, <strong>take a photo of your face</strong> using your phone or computer camera. This photo is used for verification and for reactivating your account later.</li>
+                    <li data-step="5">Submit your registration. OSCA staff will review it and approve your account.</li>
+                </ol>
+                <div class="warn"><i class="fas fa-triangle-exclamation"></i><span><strong>Important:</strong> Ask a family member or visit the OSCA office if you need help registering. Never share your password with strangers.</span></div>
+            </div>
+
+            <div class="manual-section" id="m-login">
+                <span class="sec-kicker">Section 3 of 15</span>
+                <h2><i class="fas fa-right-to-bracket"></i>Logging in</h2>
+                <ol class="steps">
+                    <li data-step="1">On the home page, click your role: <strong>Senior Citizen</strong>.</li>
+                    <li data-step="2">Type your <strong>email address</strong> and <strong>password</strong>.</li>
+                    <li data-step="3">Click <strong>Verify &amp; Login</strong>.</li>
+                </ol>
+                <div class="info"><i class="fas fa-circle-info"></i><span>Senior citizens log in with <strong>email + password only</strong> (a simpler login designed for older users). Admin and OSCA staff use an extra email code for added security.</span></div>
+            </div>
+
+            <div class="manual-section" id="m-dashboard">
+                <span class="sec-kicker">Section 4 of 15</span>
+                <h2><i class="fas fa-gauge-high"></i>Your dashboard &amp; tabs</h2>
+                <p class="lead">After logging in you will see big buttons (tabs) at the top. On a small phone the tabs wrap into two rows, so nothing is hidden.</p>
+                <ul class="tab-ref">
+                    <li><b><i class="fas fa-gauge-high"></i>Dashboard</b><span>Your account status, next pension release, and recent notifications.</span></li>
+                    <li><b><i class="fas fa-user"></i>Profile</b><span>Your personal information and your QR digital ID.</span></li>
+                    <li><b><i class="fas fa-hand-holding-heart"></i>Benefits</b><span>Apply for burial or bedridden assistance and view your claim history.</span></li>
+                    <li><b><i class="fas fa-calendar-check"></i>Appointments</b><span>Book OSCA visits, see your queue number, and set medication reminders.</span></li>
+                    <li><b><i class="fas fa-user-shield"></i>Get Verified</b><span>Complete your identity verification to unlock all services.</span></li>
+                    <li><b><i class="fas fa-bell"></i>Notifications</b><span>Messages and reminders from OSCA. A red dot means something new.</span></li>
+                </ul>
+                <div class="info"><i class="fas fa-circle-info"></i><span>The green menu button (three lines) beside the logo opens the services menu, and the <strong>MANUAL</strong> button reopens this guide anytime.</span></div>
+            </div>
+            <div class="manual-section" id="m-verify">
+                <span class="sec-kicker">Section 5 of 15</span>
+                <h2><i class="fas fa-user-shield"></i>Getting verified (KYC)</h2>
+                <p class="lead">Verification proves that you are really you. It keeps your benefits safe and unlocks all services.</p>
+                <p><strong>Prepare before you start:</strong></p>
+                <ul class="checklist">
+                    <li><i class="fas fa-circle-check"></i><span>Your <strong>Senior Citizen ID</strong> - clear photos of the <strong>front and back</strong></span></li>
+                    <li><i class="fas fa-circle-check"></i><span>Good lighting for your <strong>selfie</strong> (remove your hat or eyeglasses if possible)</span></li>
+                    <li><i class="fas fa-circle-check"></i><span>A phone or computer with a <strong>working camera</strong></span></li>
+                </ul>
+                <ol class="steps">
+                    <li data-step="1">Open the <strong>Get Verified</strong> tab.</li>
+                    <li data-step="2">Take a clear photo of your <strong>Senior Citizen ID (front and back)</strong>.</li>
+                    <li data-step="3">Take a clear <strong>selfie</strong> following the on-screen guide.</li>
+                    <li data-step="4">Submit. OSCA staff will review your documents and mark you <strong>Verified</strong>.</li>
+                </ol>
+                <div class="info"><i class="fas fa-circle-info"></i><span>While waiting, some features (like benefits applications) stay <strong>locked</strong> until you are Verified. A green <strong>Verified &check;</strong> badge appears on your dashboard once approved.</span></div>
+            </div>
+
+            <div class="manual-section" id="m-benefits">
+                <span class="sec-kicker">Section 6 of 15</span>
+                <h2><i class="fas fa-hand-holding-heart"></i>Applying for assistance &amp; pension</h2>
+                <h3>Monthly pension</h3>
+                <p>Your pension balance and payout history appear on the Dashboard and the Benefits tab. OSCA staff approve payouts - you will be notified when money is released.</p>
+                <h3>Burial / bedridden assistance</h3>
+                <ol class="steps">
+                    <li data-step="1">Open the <strong>Benefits</strong> tab.</li>
+                    <li data-step="2">Choose <strong>Burial Assistance</strong> or <strong>Bedridden Assistance</strong>.</li>
+                    <li data-step="3">Fill in the form and attach the required documents.</li>
+                    <li data-step="4">Submit and wait for OSCA review. Track your claim status in the same tab.</li>
+                </ol>
+                <div class="tip"><i class="fas fa-lightbulb"></i><span>The system suggests a <strong>priority level</strong> (High, Medium, or Low) using official rules - for example age, health condition, and disability - but <strong>OSCA staff always make the final decision</strong>.</span></div>
+            </div>
+
+            <div class="manual-section" id="m-qr">
+                <span class="sec-kicker">Section 7 of 15</span>
+                <h2><i class="fas fa-qrcode"></i>Your QR digital ID</h2>
+                <p class="lead">Your personal QR code works like a digital ID card.</p>
+                <ol class="steps">
+                    <li data-step="1">Open the <strong>Profile</strong> tab.</li>
+                    <li data-step="2">Show the <strong>QR code</strong> at the OSCA office so staff can verify your identity quickly by scanning it.</li>
+                    <li data-step="3">Optional: press <strong>Download Digital ID</strong> to save a copy on your phone.</li>
+                </ol>
+                <div class="tip"><i class="fas fa-lightbulb"></i><span>Save the downloaded Digital ID on your phone so you can still show it even without internet connection.</span></div>
+            </div>
+
+            <div class="manual-section" id="m-appt">
+                <span class="sec-kicker">Section 8 of 15</span>
+                <h2><i class="fas fa-calendar-check"></i>Booking appointments &amp; queue numbers</h2>
+                <ol class="steps">
+                    <li data-step="1">Open the <strong>Appointments</strong> tab.</li>
+                    <li data-step="2">Pick a <strong>visit date</strong>, <strong>time</strong>, and <strong>purpose of visit</strong> (for example: Pension Claim, Health Check-up).</li>
+                    <li data-step="3">Click <strong>Book Appointment</strong>. Your <strong>queue number</strong> appears automatically.</li>
+                    <li data-step="4">Show your queue number when you arrive at the OSCA office.</li>
+                </ol>
+                <p>Need a different schedule? Use <strong>Reschedule</strong> in the same tab. You will also get reminders before your visit.</p>
+                <div class="info"><i class="fas fa-circle-info"></i><span>Please arrive about <strong>15 minutes early</strong> for your visit - your queue number keeps your spot in line.</span></div>
+            </div>
+
+            <div class="manual-section" id="m-meds">
+                <span class="sec-kicker">Section 9 of 15</span>
+                <h2><i class="fas fa-pills"></i>Medication reminders &amp; refills</h2>
+                <h3>Daily reminders</h3>
+                <ol class="steps">
+                    <li data-step="1">Open the <strong>Appointments</strong> tab and find <strong>My Medication Reminders</strong>.</li>
+                    <li data-step="2">Click <strong>Add Reminder</strong>, type the medicine name, dosage, and the time(s) you take it.</li>
+                    <li data-step="3">When it is time, a reminder pops up. Press <strong>Mark as Taken</strong> after drinking your medicine.</li>
+                </ol>
+                <h3>Requesting a refill</h3>
+                <p>Running out of medicine? Use <strong>Request Medication Refill</strong> in the same tab. OSCA staff will respond to your request.</p>
+            </div>
+            <div class="manual-section" id="m-notif">
+                <span class="sec-kicker">Section 10 of 15</span>
+                <h2><i class="fas fa-bell"></i>Notifications</h2>
+                <p>Open the <strong>Notifications</strong> tab to read messages from OSCA - for example pension releases, appointment reminders, and medication reminders. A red dot appears on the tab when there is something new.</p>
+            </div>
+
+            <div class="manual-section" id="m-react">
+                <span class="sec-kicker">Section 11 of 15</span>
+                <h2><i class="fas fa-face-smile"></i>My account is inactive - how to reactivate it</h2>
+                <p class="lead">If your account became <strong>inactive</strong>, you do <strong>not</strong> need to register again. You can reactivate it yourself:</p>
+                <ol class="steps">
+                    <li data-step="1">On the home page, choose <strong>Senior Citizen</strong>, then click <strong>Account inactive? Reactivate with Face Scan</strong>.</li>
+                    <li data-step="2">Type your <strong>OSCA / Senior Citizen ID number</strong>, then press <strong>Continue to Face Scan</strong>.</li>
+                    <li data-step="3">Press <strong>Start Camera</strong>, look straight at the camera, then press <strong>Scan My Face</strong>.</li>
+                    <li data-step="4">If your face matches your registration photo, press <strong>Send Reactivation Request</strong>.</li>
+                    <li data-step="5">Keep the page open - <strong>OSCA staff will review and approve</strong> your request, and the page will update by itself. Once approved, you can log in again.</li>
+                </ol>
+                <div class="warn"><i class="fas fa-triangle-exclamation"></i><span>No camera, or the scan keeps failing? Visit the OSCA office - staff can help reactivate your account there.</span></div>
+            </div>
+
+            <div class="manual-section" id="m-safe">
+                <span class="sec-kicker">Section 12 of 15</span>
+                <h2><i class="fas fa-shield-halved"></i>Staying safe &amp; your privacy</h2>
+                <ul>
+                    <li>Never share your <strong>password</strong> or <strong>email codes</strong> with anyone. OSCA staff will never ask for them.</li>
+                    <li>Your health records are <strong>private</strong> - only you, your authorized health center, and OSCA staff can see them, and every viewing is recorded.</li>
+                    <li>Always press <strong>Logout</strong> when using a shared phone or computer.</li>
+                </ul>
+            </div>
+
+            <div class="manual-section" id="m-words">
+                <span class="sec-kicker">Section 13 of 15</span>
+                <h2><i class="fas fa-book-open"></i>Words you may see</h2>
+                <dl class="glossary">
+                    <div><dt>OSCA</dt><dd>Office of the Senior Citizens Affairs - the government office that runs senior citizen services in Magalang.</dd></div>
+                    <div><dt>Get Verified / KYC</dt><dd>Proving your identity with your Senior Citizen ID and a selfie.</dd></div>
+                    <div><dt>Pending</dt><dd>OSCA has received your request but has not finished reviewing it yet.</dd></div>
+                    <div><dt>Verified</dt><dd>OSCA has approved your identity. A green badge appears on your account.</dd></div>
+                    <div><dt>Queue number</dt><dd>Your place in line at the OSCA office on the day of your visit.</dd></div>
+                    <div><dt>Priority level</dt><dd>A rating (High, Medium, Low) that helps OSCA decide who needs assistance first.</dd></div>
+                    <div><dt>Digital ID (QR)</dt><dd>A QR code in your Profile tab that staff scan to confirm your identity.</dd></div>
+                    <div><dt>Reactivation</dt><dd>Turning an inactive account back on. See Section 11.</dd></div>
+                </dl>
+            </div>
+
+            <div class="manual-section" id="m-faq">
+                <span class="sec-kicker">Section 14 of 15</span>
+                <h2><i class="fas fa-circle-question"></i>Common questions</h2>
+                <div class="faq">
+                    <details>
+                        <summary>I forgot my password. What do I do?</summary>
+                        <div class="faq-a"><p>Ask a family member to help you, or visit the OSCA office - staff can reset it for you.</p></div>
+                    </details>
+                    <details>
+                        <summary>My registration is &quot;Pending&quot;. What does that mean?</summary>
+                        <div class="faq-a"><p>It means OSCA staff have not reviewed your registration yet. Please wait - you will be notified once approved.</p></div>
+                    </details>
+                    <details>
+                        <summary>The text on my screen is too small.</summary>
+                        <div class="faq-a"><p>On a computer, hold <span class="kbd">Ctrl</span> and press <span class="kbd">+</span>. On a phone, pinch to zoom, or increase the text size in your phone settings.</p></div>
+                    </details>
+                    <details>
+                        <summary>No camera, or the face scan keeps failing?</summary>
+                        <div class="faq-a"><p>Make sure you are in a bright place and look straight at the camera. If it still fails, visit the OSCA office - staff can verify or reactivate you in person.</p></div>
+                    </details>
+                    <details>
+                        <summary>Where do I ask for help in person?</summary>
+                        <div class="faq-a"><p>Visit the <strong>OSCA Office, Municipality of Magalang, Pampanga</strong>, or ask at your <strong>barangay health center</strong>. Bring your Senior Citizen ID.</p></div>
+                    </details>
+                </div>
+            </div>
+
+            <div class="manual-section" id="m-help">
+                <span class="sec-kicker">Section 15 of 15</span>
+                <h2><i class="fas fa-headset"></i>Getting help</h2>
+                <ul class="checklist">
+                    <li><i class="fas fa-map-marker-alt"></i><span><strong>OSCA Office</strong> - Municipality of Magalang, Pampanga (during office hours)</span></li>
+                    <li><i class="fas fa-clinic-medical"></i><span><strong>Barangay health center</strong> - for health record questions</span></li>
+                    <li><i class="fas fa-id-card"></i><span>Always <strong>bring your Senior Citizen ID</strong> and know your OSCA ID number</span></li>
+                </ul>
+                <div class="info"><i class="fas fa-circle-info"></i><span>This manual is always available inside the Senior Portal - press the <strong>MANUAL</strong> button in the top menu.</span></div>
+            </div>
+        </main>
+    </div>
+
+    <footer class="manual-footer">
+        <div class="doc-meta">
+            <span><i class="fas fa-code-branch"></i> Version 2.0</span>
+            <span><i class="fas fa-calendar"></i> September 2026</span>
+            <span><i class="fas fa-landmark"></i> OSCA Magalang, Pampanga</span>
+        </div>
+        <p>SilverCare - Senior Citizen Benefits &amp; Health Records System &middot; You can print this manual or save it as a PDF using the Print button above.</p>
+    </footer>
+
+    <button id="backTop" aria-label="Back to top"><i class="fas fa-arrow-up"></i></button>
+<!-- SC_MANUAL_P2 -->
+    <script>
+    (function () {
+        // Reading progress + back-to-top
+        var progressBar = document.getElementById('progressBar');
+        var backTop = document.getElementById('backTop');
+        function onScroll() {
+            var doc = document.documentElement;
+            var max = doc.scrollHeight - window.innerHeight;
+            var pct = max > 0 ? (window.scrollY / max) * 100 : 0;
+            if (progressBar) progressBar.style.width = pct + '%';
+            if (backTop) backTop.classList.toggle('show', window.scrollY > 600);
+        }
+        window.addEventListener('scroll', onScroll, { passive: true });
+        onScroll();
+        if (backTop) backTop.addEventListener('click', function () { window.scrollTo({ top: 0, behavior: 'smooth' }); });
+
+        // Scroll spy - highlight the section currently being read
+        var links = Array.prototype.slice.call(document.querySelectorAll('#navList a'));
+        var sections = links.map(function (a) { return document.getElementById(a.getAttribute('href').slice(1)); });
+        function setActive() {
+            var pos = window.scrollY + 140;
+            var current = -1;
+            for (var i = 0; i < sections.length; i++) {
+                if (sections[i] && sections[i].offsetTop <= pos) current = i;
+            }
+            links.forEach(function (a, idx) { a.classList.toggle('active', idx === current); });
+        }
+        window.addEventListener('scroll', setActive, { passive: true });
+        setActive();
+
+        // Search filter for the contents list
+        var searchBox = document.getElementById('navSearch');
+        var emptyMsg = document.getElementById('navEmpty');
+        if (searchBox) {
+            searchBox.addEventListener('input', function () {
+                var q = searchBox.value.toLowerCase().trim();
+                var visible = 0;
+                links.forEach(function (a) {
+                    var hit = a.textContent.toLowerCase().indexOf(q) !== -1;
+                    a.parentElement.style.display = hit ? '' : 'none';
+                    if (hit) visible++;
+                });
+                if (emptyMsg) emptyMsg.style.display = visible ? 'none' : 'block';
+            });
+        }
+
+        // Mobile: toggle the contents card
+        var toggle = document.getElementById('navToggle');
+        var card = document.getElementById('navCard');
+        if (toggle && card) {
+            toggle.addEventListener('click', function () {
+                var open = card.classList.toggle('open');
+                toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+            });
+            links.forEach(function (a) {
+                a.addEventListener('click', function () {
+                    if (window.innerWidth <= 980) {
+                        card.classList.remove('open');
+                        toggle.setAttribute('aria-expanded', 'false');
+                    }
+                });
+            });
+        }
+
+        // Print: open all FAQ answers so nothing is hidden on paper
+        var wasOpen = [];
+        window.addEventListener('beforeprint', function () {
+            wasOpen = Array.prototype.slice.call(document.querySelectorAll('.faq details[open]'));
+            document.querySelectorAll('.faq details').forEach(function (d) { d.open = true; });
+        });
+        window.addEventListener('afterprint', function () {
+            document.querySelectorAll('.faq details').forEach(function (d) { d.open = wasOpen.indexOf(d) !== -1; });
+        });
+    })();
+    </script>
+</body>
+</html>

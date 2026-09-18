@@ -25,3 +25,6 @@ npm-debug.log*
 Thumbs.db
 
 SilverCare_Backup_*.json
+
+# Automatic daily database backups (server-side snapshots)
+backups/

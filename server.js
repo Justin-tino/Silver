@@ -1,12 +1,15 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const crypto = require('crypto');
 const path = require('path');
 const nodemailer = require('nodemailer');
 const admin = require('firebase-admin');
+const QRCode = require('qrcode');
 const idVault = require('./lib/supabaseStorage');
+const medicalVault = require('./lib/medicalVault');
+const seniorStore = require('./lib/supabaseDatabase');
 const priorityEngine = require('./public/js/priority-engine');
-const queueBackend = require('./_queue_backend');
 
 // Initialize Firebase Admin
 const fs = require('fs');
@@ -61,6 +64,15 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
+// --- Express 5 safety net: req.body is undefined (not {}) when a request has no
+// JSON/urlencoded payload. Several public endpoints destructure req.body BEFORE
+// their try/catch (e.g. /api/forgot-password), which would crash with a 500.
+// This middleware guarantees req.body is always at least an empty object.
+app.use((req, res, next) => {
+    if (req.body === undefined || req.body === null) req.body = {};
+    next();
+});
+
 // --- Serve Firebase Config dynamically BEFORE static files ---
 // This route takes precedence over the hardcoded public/js/firebase-config.js
 app.get('/js/firebase-config.js', (req, res) => {
@@ -77,11 +89,36 @@ app.get('/js/firebase-config.js', (req, res) => {
 };`);
 });
 
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public'), {
+    // HTML + JS must always revalidate so frontend fixes are picked up
+    // immediately (no stale-cache surprises like an old KYC validator).
+    etag: true,
+    setHeaders: (res, filePath) => {
+        if (/\.(html|js|mjs|css)$/i.test(filePath)) {
+            res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+        }
+    }
+}));
 
 // --- OTP In-Memory Store ---
 const otpStore = new Map(); // email -> { pin, expiresAt }
 const otpAttempts = new Map(); // email -> { count, lockedUntil }
+
+// --- Reactivation start rate limiting (prevents OSCA ID enumeration) ---
+const REACTIVATION_START_WINDOW_MS = 10 * 60 * 1000;
+const REACTIVATION_START_MAX = 15;
+const reactivationStartHits = new Map(); // ip -> { count, resetAt }
+
+function reactivationStartRateLimited(ip) {
+    const now = Date.now();
+    const rec = reactivationStartHits.get(ip);
+    if (!rec || now > rec.resetAt) {
+        reactivationStartHits.set(ip, { count: 1, resetAt: now + REACTIVATION_START_WINDOW_MS });
+        return false;
+    }
+    rec.count += 1;
+    return rec.count > REACTIVATION_START_MAX;
+}
 
 // --- Nodemailer Transporter ---
 const transporter = nodemailer.createTransport({
@@ -437,6 +474,12 @@ function twoFAEmailTemplate(pin) {
 app.post('/api/2fa/start', requireAuth, requireRole('admin', 'employee'), async (req, res) => {
     try {
         const actor = req.authUser;
+
+        // The default/Master Admin account is exempt from e-mail OTP
+        if (String(actor.email || '').toLowerCase() === 'admin@silvercare.com') {
+            return res.json({ success: true, message: 'Two-factor authentication is not required for this account.' });
+        }
+
         const existing = twoFAStore.get(actor.uid);
 
         // Rate-limit resend attempts
@@ -473,6 +516,13 @@ app.post('/api/2fa/start', requireAuth, requireRole('admin', 'employee'), async 
 // --- API: Verify 2FA challenge (admin/staff). Single-use, bound to uid. ---
 app.post('/api/2fa/verify', requireAuth, requireRole('admin', 'employee'), (req, res) => {
     const actor = req.authUser;
+
+    // The default/Master Admin account is exempt from e-mail OTP
+    if (String(actor.email || '').toLowerCase() === 'admin@silvercare.com') {
+        writeAuditLog('LOGIN_2FA_SUCCESS', actor, actor.uid, null, 'Master admin sign-in (2FA-exempt)');
+        return res.json({ success: true, message: 'Two-factor authentication verified.' });
+    }
+
     const code = String(req.body.code || '').trim();
     if (!/^\d{6}$/.test(code)) {
         return res.status(400).json({ success: false, message: 'Enter the 6-digit security code.' });
@@ -503,6 +553,408 @@ app.post('/api/2fa/verify', requireAuth, requireRole('admin', 'employee'), (req,
     twoFAStore.delete(actor.uid);
     writeAuditLog('LOGIN_2FA_SUCCESS', actor, actor.uid, null, 'Staff sign-in completed with 2FA');
     res.json({ success: true, message: 'Two-factor authentication verified.' });
+});
+
+// ============================================================
+// Password Reset via E-mailed Link (ADMIN accounts only).
+// A single-use, 15-minute reset token is e-mailed to the
+// admin's registered address. The link opens /reset-password
+// where a new password is set through the Firebase Admin SDK.
+// ============================================================
+const passwordResetStore = new Map();  // token -> { uid, email, expiresAt }
+const resetRequestStore = new Map();   // email -> lastSentAt (request rate limit)
+const RESET_TOKEN_TTL_MS = 15 * 60 * 1000;
+const RESET_REQUEST_COOLDOWN_MS = 60 * 1000;
+
+function passwordResetEmailTemplate(resetLink) {
+    return `
+    <div style="font-family: 'Inter', Arial, sans-serif; max-width: 500px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.08);">
+        <div style="background: linear-gradient(135deg, #1e3a8a, #2563eb); padding: 30px; text-align: center;">
+            <h1 style="color: white; margin: 0; font-size: 1.5rem;">SilverCare</h1>
+            <p style="color: rgba(255,255,255,0.8); margin: 5px 0 0; font-size: 0.9rem;">OSCA Magalang — Admin Portal</p>
+        </div>
+        <div style="padding: 30px;">
+            <h2 style="color: #1e293b; margin-top: 0;">Password Reset Request</h2>
+            <p style="color: #64748b; line-height: 1.6;">We received a request to reset the password for your SilverCare admin account. Click the button below to choose a new password:</p>
+            <div style="text-align: center; margin: 25px 0;">
+                <a href="${resetLink}" style="background: #2563eb; color: #ffffff; text-decoration: none; padding: 14px 36px; border-radius: 8px; font-weight: 600; display: inline-block;">Reset Password</a>
+            </div>
+            <p style="color: #94a3b8; font-size: 0.85rem;">This link expires in <strong>15 minutes</strong> and can only be used once. If you did not request a password reset, you can safely ignore this email — your current password remains unchanged.</p>
+        </div>
+        <div style="background: #f8fafc; padding: 15px; text-align: center; border-top: 1px solid #e2e8f0;">
+            <p style="color: #94a3b8; font-size: 0.75rem; margin: 0;">© 2026 SilverCare - OSCA Magalang</p>
+        </div>
+    </div>`;
+}
+
+// ============================================================
+// Facial Recognition — Inactive Account Reactivation
+// Lets seniors reactivate an inactive account: they enter the
+// OSCA / Senior Citizen ID from their registration, then match a
+// live face scan against the face photo stored at registration.
+// The scanned face is attached to that account's review request
+// for OSCA staff, who give the final approval.
+// ============================================================
+const reactivationChallenges = new Map(); // token -> { uid, email, expiresAt, attempts }
+const REACTIVATION_TOKEN_TTL_MS = 10 * 60 * 1000;
+const REACTIVATION_MAX_ATTEMPTS = 5;
+const REACTIVATION_MATCH_THRESHOLD = 0.6; // face descriptor euclidean distance (lower = closer match)
+
+setInterval(() => {
+    const now = Date.now();
+    for (const [token, c] of reactivationChallenges) {
+        if (!c || now > c.expiresAt) reactivationChallenges.delete(token);
+    }
+}, 5 * 60 * 1000);
+
+function getReactivationChallenge(token) {
+    if (!token || typeof token !== 'string') return null;
+    const c = reactivationChallenges.get(token);
+    if (!c) return null;
+    if (Date.now() > c.expiresAt) { reactivationChallenges.delete(token); return null; }
+    return c;
+}
+
+// Shared eligibility check — returns { ok, code, message, user, uid }
+async function checkReactivationEligibility(u, uid) {
+    const status = u.status || '';
+    const life = u.lifeStatus || '';
+    if (u.role !== 'senior') {
+        return { ok: false, code: 400, message: 'Face-scan reactivation is available for senior citizen accounts only.' };
+    }
+    if (['Deceased', 'Transferred', 'Archived'].includes(life)) {
+        return { ok: false, code: 400, message: 'This record is archived and cannot be reactivated online. Please visit the OSCA office.' };
+    }
+    if (status === 'Pending') {
+        return { ok: false, code: 400, message: 'Your registration is still pending review. Please wait for OSCA staff approval.' };
+    }
+    if (status === 'Rejected') {
+        return { ok: false, code: 400, message: 'Your registration was not approved. Please visit the OSCA office for help.' };
+    }
+    if (status === 'Active' && (!life || life === 'Active')) {
+        return { ok: false, code: 400, message: 'Your account is already active. You can log in directly.' };
+    }
+    if (!(status === 'Inactive' || life === 'Inactive')) {
+        return { ok: false, code: 400, message: 'Your account is already active. You can log in directly.' };
+    }
+    if (!u.kycFaceImage) {
+        return { ok: false, code: 400, message: 'No face scan is on file for this account. Please visit the OSCA office for assisted reactivation.' };
+    }
+    const reqSnap = await admin.database().ref(`reactivationRequests/${uid}`).once('value');
+    if (reqSnap.exists() && reqSnap.val() && reqSnap.val().status === 'Pending') {
+        return { ok: false, code: 400, message: 'You already have a pending reactivation request. Please wait for OSCA staff to review it.' };
+    }
+    return { ok: true, user: u, uid };
+}
+
+// --- API: Start face-scan reactivation — find the account by OSCA / Senior ID (public) ---
+app.post('/api/reactivation/start', async (req, res) => {
+    const { seniorId } = req.body || {};
+    const cleanId = String(seniorId || '').trim();
+    if (!cleanId) return res.status(400).json({ success: false, message: 'Please type your OSCA / Senior Citizen ID number.' });
+    if (reactivationStartRateLimited(req.ip)) {
+        return res.status(429).json({ success: false, message: 'Too many attempts. Please wait a few minutes and try again, or visit the OSCA office.' });
+    }
+    try {
+        // Find the senior account whose registered OSCA ID matches the one typed.
+        const snap = await admin.database().ref('users').orderByChild('role').equalTo('senior').once('value');
+        const users = snap.val() || {};
+        const normId = cleanId.toUpperCase();
+        let uid = '';
+        let u = null;
+        for (const [key, rec] of Object.entries(users)) {
+            if (String(rec.seniorId || '').trim().toUpperCase() === normId) { uid = key; u = rec; break; }
+        }
+        if (!u) {
+            return res.status(404).json({ success: false, message: 'No senior record matches that OSCA ID. Please check the ID given at registration, or visit the OSCA office for help.' });
+        }
+        const check = await checkReactivationEligibility(u, uid);
+        if (!check.ok) return res.status(check.code).json({ success: false, message: check.message });
+
+        // Issue a short-lived token bound to that account — the face scan and the
+        // resulting staff review request are attached to this exact senior record.
+        const token = crypto.randomBytes(24).toString('hex');
+        reactivationChallenges.set(token, { uid, email: String(u.email || '').toLowerCase(), expiresAt: Date.now() + REACTIVATION_TOKEN_TTL_MS, attempts: 0 });
+        await writeAuditLog('ACCOUNT_REACTIVATION_ID_LOOKUP', { uid: 'system', role: 'system', name: 'System' }, uid, null, `Face-scan reactivation started using OSCA ID ${u.seniorId || cleanId}. Awaiting face scan.`);
+        return res.json({ success: true, token, name: u.name || 'Senior Citizen', seniorId: u.seniorId || cleanId });
+    } catch (err) {
+        console.error('Reactivation start error:', err);
+        return res.status(500).json({ success: false, message: 'Could not start the face scan. Please try again.' });
+    }
+});
+
+// --- API: Fetch stored face photo for comparison (token-gated, public) ---
+app.get('/api/reactivation/reference/:token', async (req, res) => {
+    try {
+        const c = getReactivationChallenge(req.params.token);
+        if (!c) return res.status(401).json({ success: false, message: 'Your session expired. Please start over.' });
+        const snap = await admin.database().ref(`users/${c.uid}/kycFaceImage`).once('value');
+        if (!snap.exists() || !snap.val()) return res.status(400).json({ success: false, message: 'No face scan on file. Please visit the OSCA office.' });
+        return res.json({ success: true, referenceImage: snap.val() });
+    } catch (err) {
+        console.error('Reactivation reference error:', err);
+        return res.status(500).json({ success: false, message: 'Could not load the stored face photo. Please try again.' });
+    }
+});
+
+// --- API: Submit face-match result — creates a staff review request (token-gated, public) ---
+app.post('/api/reactivation/submit', async (req, res) => {
+    const { token, distance, liveImage } = req.body || {};
+    try {
+        const c = getReactivationChallenge(token);
+        if (!c) return res.status(401).json({ success: false, message: 'Your session expired. Please start over.' });
+        c.attempts += 1;
+        if (c.attempts > REACTIVATION_MAX_ATTEMPTS) {
+            reactivationChallenges.delete(token);
+            return res.status(429).json({ success: false, message: 'Too many attempts. Please start over or visit the OSCA office.' });
+        }
+        const dist = Number(distance);
+        if (!Number.isFinite(dist)) return res.status(400).json({ success: false, message: 'Face scan result is missing. Please scan your face again.' });
+        if (dist > REACTIVATION_MATCH_THRESHOLD) {
+            return res.status(400).json({ success: false, message: 'Face did not match our records. Please face the camera clearly and try again.' });
+        }
+        if (!liveImage || typeof liveImage !== 'string' || !liveImage.startsWith('data:image') || liveImage.length > 500000) {
+            return res.status(400).json({ success: false, message: 'Live photo is missing or too large. Please scan your face again.' });
+        }
+
+        const userSnap = await admin.database().ref(`users/${c.uid}`).once('value');
+        if (!userSnap.exists()) return res.status(404).json({ success: false, message: 'Account record not found.' });
+        const u = userSnap.val() || {};
+        if ((u.status || '') === 'Active' && (!u.lifeStatus || u.lifeStatus === 'Active')) {
+            reactivationChallenges.delete(token);
+            return res.status(400).json({ success: false, message: 'Your account is already active. You can log in directly.' });
+        }
+        const existing = await admin.database().ref(`reactivationRequests/${c.uid}`).once('value');
+        if (existing.exists() && existing.val() && existing.val().status === 'Pending') {
+            reactivationChallenges.delete(token);
+            return res.status(400).json({ success: false, message: 'You already have a pending reactivation request.' });
+        }
+
+        const confidence = Math.max(0, Math.min(100, Math.round((1 - dist) * 100)));
+        await admin.database().ref(`reactivationRequests/${c.uid}`).set({
+            uid: c.uid, email: c.email, name: u.name || 'Senior Citizen', seniorId: u.seniorId || 'N/A',
+            barangay: u.barangay || '', liveImage, referenceImage: u.kycFaceImage || '',
+            distance: dist, confidence, status: 'Pending', requestedAt: Date.now()
+        });
+        reactivationChallenges.delete(token);
+
+        await notifyStaff('Account Reactivation Request', `${u.name || 'A senior'} (${u.seniorId || c.email}) requested account reactivation via face scan (match ${confidence}%). Please review it in the Archive tab.`);
+        await writeAuditLog('ACCOUNT_REACTIVATION_REQUESTED', { uid: 'system', role: 'system', name: 'System' }, c.uid, null, `Face-scan reactivation requested with match confidence ${confidence}%. Awaiting staff review.`);
+        return res.json({ success: true, message: 'Face scan matched! Your request was sent. OSCA staff will review it — please check back later or log in once approved.' });
+    } catch (err) {
+        console.error('Reactivation submit error:', err);
+        return res.status(500).json({ success: false, message: 'Could not submit your request. Please try again.' });
+    }
+});
+
+// --- API: List reactivation requests (staff only) ---
+app.get('/api/reactivation/requests', requireAuth, requireRole('admin', 'employee'), async (req, res) => {
+    try {
+        const snap = await admin.database().ref('reactivationRequests').once('value');
+        const list = [];
+        if (snap.exists()) {
+            snap.forEach(child => { list.push({ id: child.key, ...child.val() }); });
+        }
+        list.sort((a, b) => (b.requestedAt || 0) - (a.requestedAt || 0));
+        return res.json({ success: true, requests: list.slice(0, 100) });
+    } catch (err) {
+        console.error('Reactivation list error:', err);
+        return res.status(500).json({ success: false, message: 'Failed to load reactivation requests.' });
+    }
+});
+
+// --- API: Approve / reject a reactivation request (staff only — final human decision) ---
+app.post('/api/reactivation/requests/:uid/review', requireAuth, requireRole('admin', 'employee'), async (req, res) => {
+    try {
+        const targetUid = req.params.uid;
+        const { approve, note } = req.body || {};
+        const reqSnap = await admin.database().ref(`reactivationRequests/${targetUid}`).once('value');
+        if (!reqSnap.exists() || !reqSnap.val()) {
+            return res.status(404).json({ success: false, message: 'Request not found.' });
+        }
+        const rec = reqSnap.val();
+        if (rec.status !== 'Pending') {
+            return res.status(400).json({ success: false, message: 'This request was already reviewed.' });
+        }
+
+        const actor = req.authUser;
+        if (approve === true || approve === 'true') {
+            const userSnap = await admin.database().ref(`users/${targetUid}`).once('value');
+            if (!userSnap.exists()) return res.status(404).json({ success: false, message: 'Senior record not found.' });
+            const u = userSnap.val() || {};
+            if (['Deceased', 'Transferred', 'Archived'].includes(u.lifeStatus || '')) {
+                await admin.database().ref(`reactivationRequests/${targetUid}`).update({ status: 'Rejected', reviewedBy: actor.name || actor.email, reviewedAt: Date.now(), reviewNote: ((note || '') + ' [Auto-note: record is archived; office visit required.]').slice(0, 500) });
+                return res.status(400).json({ success: false, message: 'Cannot reactivate — this record is archived. The senior must visit the OSCA office.' });
+            }
+            const updates = { status: 'Active' };
+            if ((u.lifeStatus || '') === 'Inactive') updates.lifeStatus = 'Active';
+            await admin.database().ref(`users/${targetUid}`).update(updates);
+            await admin.database().ref(`reactivationRequests/${targetUid}`).update({ status: 'Approved', reviewedBy: actor.name || actor.email, reviewedAt: Date.now(), reviewNote: note || '' });
+            await admin.database().ref(`users/${targetUid}/notifications`).push({
+                title: 'Account Reactivated',
+                message: 'Good news! Your SilverCare account is active again. You can now log in. — OSCA Magalang',
+                createdAt: Date.now(), read: false, type: 'account'
+            });
+            await writeAuditLog('ACCOUNT_REACTIVATION_APPROVED', actor, targetUid, null, `Face-scan reactivation approved (match ${rec.confidence || '?'}%). Account reactivated by staff.`);
+            return res.json({ success: true, message: 'Account reactivated. The senior can now log in.' });
+        }
+
+        await admin.database().ref(`reactivationRequests/${targetUid}`).update({ status: 'Rejected', reviewedBy: actor.name || actor.email, reviewedAt: Date.now(), reviewNote: note || '' });
+        await admin.database().ref(`users/${targetUid}/notifications`).push({
+            title: 'Reactivation Request Not Approved',
+            message: (note ? note + ' ' : '') + 'Please visit the OSCA office for assistance. — OSCA Magalang',
+            createdAt: Date.now(), read: false, type: 'account'
+        });
+        await writeAuditLog('ACCOUNT_REACTIVATION_REJECTED', actor, targetUid, null, `Face-scan reactivation rejected. Note: ${(note || 'none').slice(0, 200)}`);
+        return res.json({ success: true, message: 'Request rejected. The senior has been notified.' });
+    } catch (err) {
+        console.error('Reactivation review error:', err);
+        return res.status(500).json({ success: false, message: 'Failed to review the request.' });
+    }
+});
+
+// --- API: Senior polls their reactivation request status (public — minimal safe fields) ---
+// The waiting screen calls this every few seconds after submitting the face scan,
+// so the senior sees the staff decision (approved / not approved) without refreshing.
+app.get('/api/reactivation/status', async (req, res) => {
+    try {
+        const seniorId = String((req.query && req.query.seniorId) || '').trim();
+        if (!seniorId) return res.status(400).json({ success: false, message: 'Senior ID is required.' });
+        const usersSnap = await admin.database().ref('users').orderByChild('role').equalTo('senior').once('value');
+        const users = usersSnap.val() || {};
+        const normId = seniorId.toUpperCase();
+        let uid = '';
+        for (const [key, rec] of Object.entries(users)) {
+            if (String(rec.seniorId || '').trim().toUpperCase() === normId) { uid = key; break; }
+        }
+        if (!uid) return res.json({ success: true, status: 'None' });
+        const snap = await admin.database().ref(`reactivationRequests/${uid}`).once('value');
+        if (!snap.exists() || !snap.val()) return res.json({ success: true, status: 'None' });
+        const rec = snap.val();
+        return res.json({
+            success: true,
+            status: rec.status || 'Pending',
+            requestedAt: rec.requestedAt || null,
+            reviewedAt: rec.reviewedAt || null,
+            reviewNote: rec.status === 'Rejected' ? (rec.reviewNote || '') : ''
+        });
+    } catch (err) {
+        console.error('Reactivation status error:', err);
+        return res.status(500).json({ success: false, message: 'Failed to check reactivation status.' });
+    }
+});
+
+// --- API: Request a password reset link (public — no authentication) ---
+
+// --- API: Request a password reset link (public — no authentication) ---
+app.post('/api/forgot-password', async (req, res) => {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ success: false, message: 'Email is required.' });
+
+    // Identical response whether or not the account exists (prevents account enumeration)
+    const generic = { success: true, message: 'If an admin account with this email exists, a password reset link has been sent. Please check your inbox.' };
+
+    try {
+        const normEmail = String(email).trim().toLowerCase();
+
+        // Rate-limit reset requests per email
+        const lastSent = resetRequestStore.get(normEmail);
+        if (lastSent && (Date.now() - lastSent) < RESET_REQUEST_COOLDOWN_MS) {
+            const waitSec = Math.ceil((RESET_REQUEST_COOLDOWN_MS - (Date.now() - lastSent)) / 1000);
+            return res.status(429).json({ success: false, message: `Please wait ${waitSec}s before requesting another reset link.` });
+        }
+
+        // Look up the account — reset links are only issued to ADMIN accounts
+        const snap = await admin.database().ref('users').once('value');
+        const users = snap.val() || {};
+        let targetUid = null, targetEmail = null;
+        for (const [uid, u] of Object.entries(users)) {
+            if (u && u.role === 'admin' && String(u.email || '').trim().toLowerCase() === normEmail) {
+                targetUid = uid;
+                targetEmail = String(u.email).trim();
+                break;
+            }
+        }
+
+        if (!targetUid) return res.json(generic);
+
+        // Issue a single-use reset token
+        const token = crypto.randomBytes(32).toString('hex');
+        passwordResetStore.set(token, { uid: targetUid, email: targetEmail, expiresAt: Date.now() + RESET_TOKEN_TTL_MS });
+        resetRequestStore.set(normEmail, Date.now());
+
+        const base = `${req.protocol}://${req.get('host')}`;
+        const resetLink = `${base}/reset-password?token=${token}`;
+
+        await transporter.sendMail({
+            from: `"SilverCare OSCA (No-Reply)" <${process.env.EMAIL_USER}>`,
+            replyTo: 'noreply@silvercare.com',
+            to: targetEmail,
+            subject: 'SilverCare Admin — Password Reset Link',
+            html: passwordResetEmailTemplate(resetLink)
+        });
+
+        await writeAuditLog('PASSWORD_RESET_REQUESTED', { uid: targetUid, role: 'admin', email: targetEmail }, targetUid, null, 'Password reset link e-mailed');
+        res.json(generic);
+    } catch (error) {
+        console.error('Forgot password error:', error);
+        res.status(500).json({ success: false, message: 'Failed to send the reset link. Please try again.' });
+    }
+});
+
+// --- API: Validate a reset token (used by the /reset-password page on load) ---
+app.get('/api/reset-password/validate', (req, res) => {
+    const token = String(req.query.token || '');
+    const entry = passwordResetStore.get(token);
+    if (!entry || Date.now() > entry.expiresAt) {
+        if (entry) passwordResetStore.delete(token);
+        return res.json({ valid: false, message: 'This reset link is invalid or has expired. Please request a new one.' });
+    }
+    res.json({ valid: true, email: entry.email });
+});
+
+// --- API: Complete the password reset with a valid token ---
+app.post('/api/reset-password', async (req, res) => {
+    const { token, newPassword } = req.body;
+    if (!token || !newPassword) return res.status(400).json({ success: false, message: 'Reset token and new password are required.' });
+    if (String(newPassword).length < 6) return res.status(400).json({ success: false, message: 'Password must be at least 6 characters long.' });
+
+    try {
+        const entry = passwordResetStore.get(String(token));
+        if (!entry || Date.now() > entry.expiresAt) {
+            if (entry) passwordResetStore.delete(String(token));
+            return res.status(400).json({ success: false, message: 'This reset link is invalid or has expired. Please request a new one.' });
+        }
+
+        // Update the password through the Firebase Admin SDK
+        await admin.auth().updateUser(entry.uid, { password: String(newPassword) });
+        passwordResetStore.delete(String(token)); // single use
+
+        await writeAuditLog('PASSWORD_RESET_COMPLETED', { uid: entry.uid, role: 'admin', email: entry.email }, entry.uid, null, 'Password changed via e-mailed reset link');
+
+        // Best-effort confirmation email (non-blocking)
+        transporter.sendMail({
+            from: `"SilverCare OSCA (No-Reply)" <${process.env.EMAIL_USER}>`,
+            replyTo: 'noreply@silvercare.com',
+            to: entry.email,
+            subject: 'SilverCare Admin — Your Password Was Changed',
+            html: `<div style="font-family:'Inter',Arial,sans-serif;max-width:500px;margin:0 auto;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">
+                <div style="background: linear-gradient(135deg, #1e3a8a, #2563eb); padding: 25px; text-align: center;">
+                    <h1 style="color: white; margin: 0; font-size: 1.3rem;">SilverCare</h1>
+                </div>
+                <div style="padding: 25px;">
+                    <h2 style="color: #1e293b; margin-top: 0;">Password Updated</h2>
+                    <p style="color: #64748b; line-height: 1.6;">Your SilverCare admin account password was changed successfully. If this was not you, please contact the OSCA office immediately.</p>
+                    <p style="color: #94a3b8; font-size: 0.8rem;">${new Date().toLocaleString('en-PH', { timeZone: 'Asia/Manila' })} (Philippine Standard Time)</p>
+                </div>
+            </div>`
+        }).catch(err => console.error('Password-changed email failed:', err.message));
+
+        res.json({ success: true, message: 'Your password has been updated. You can now log in with your new password.' });
+    } catch (error) {
+        console.error('Reset password error:', error);
+        res.status(500).json({ success: false, message: 'Failed to update the password. Please try again.' });
+    }
 });
 
 // ============================================================
@@ -603,7 +1055,6 @@ app.post('/api/verify-login', async (req, res) => {
     }
 });
 
-
 // --- Manual Senior Registration (Employee-assisted) ---
 app.post('/api/register-senior', requireAuth, requireRole('admin', 'employee'), async (req, res) => {
     try {
@@ -641,6 +1092,14 @@ app.post('/api/register-senior', requireAuth, requireRole('admin', 'employee'), 
             displayName: fullname || `${firstName} ${lastName}`
         });
 
+        // Derive age from DOB and assign the age-based milestone senior category
+        // (80-89 Octogenarian, 90-99 Nonagenarian, 100+ Centenarian) the same way
+        // the senior self-KYC flow does, so walk-in accounts show it on the dashboard.
+        const derivedAge = computeAgeFromDob(dob);
+        const seniorCategory = derivedAge !== null && derivedAge >= 80
+            ? (derivedAge >= 100 ? 'Centenarian' : derivedAge >= 90 ? 'Nonagenarian' : 'Octogenarian')
+            : '';
+
         // Save to Realtime Database as Active (no approval needed — employee-registered)
         await admin.database().ref('users/' + userRecord.uid).set({
             email: email,
@@ -660,6 +1119,9 @@ app.post('/api/register-senior', requireAuth, requireRole('admin', 'employee'), 
             citizenship: citizenship || '',
             cpNumber: cpNumber || '',
             dob: dob || '',
+            age: derivedAge || '',
+            seniorCategory: seniorCategory || '',
+            seniorCategoryAssignedAt: seniorCategory ? Date.now() : null,
             sex: sex || '',
             civilStatus: civilStatus || '',
             kycFaceImage: faceImage,
@@ -676,6 +1138,25 @@ app.post('/api/register-senior', requireAuth, requireRole('admin', 'employee'), 
         await writeAuditLog('REGISTER_SENIOR_RECORD', req.authUser, userRecord.uid, null,
             `Registered senior "${fullname || `${firstName} ${lastName}`}" (Senior ID: ${seniorId}) via walk-in registration`);
 
+        // Mirror the senior's identity data to the Supabase store
+        // (username, senior ID, face image, ID number). Best-effort:
+        // Firebase RTDB remains the source of truth if Supabase is down.
+        if (seniorStore.isSyncEnabled()) {
+            seniorStore.syncSeniorRecord(userRecord.uid, {
+                email,
+                name: fullname || `${firstName} ${lastName}`,
+                firstName, lastName, seniorId,
+                verificationSeniorId: seniorId,
+                cpNumber, address, barangay, city, province,
+                dob, sex, civilStatus,
+                kycStatus: 'Verified',
+                lifeStatus: 'Active',
+                registeredBy: registeredBy || 'Employee'
+            }, faceImage).then(result => {
+                if (result && result.synced) console.log(`Senior "${seniorId}" mirrored to Supabase (face: ${result.facePath || 'n/a'}).`);
+            }).catch(err => console.error('Supabase senior mirror failed (registration):', err.message));
+        }
+
         res.json({ success: true, message: 'Senior citizen account created successfully.', uid: userRecord.uid });
     } catch (error) {
         console.error('Register senior error:', error);
@@ -688,6 +1169,63 @@ app.post('/api/register-senior', requireAuth, requireRole('admin', 'employee'), 
             msg = 'Password is too weak. Use at least 6 characters.';
         }
         res.json({ success: false, message: msg });
+    }
+});
+
+// ============================================================
+// Supabase Senior Data Mirror
+// Firebase RTDB = single source of truth. This endpoint mirrors a
+// senior's core identity data (username, senior ID, face image, ID
+// number) into the Supabase "seniors" table + private face bucket.
+//   - admin/employee : may sync any senior record
+//   - senior         : may sync only their OWN record
+// Used by client-side flows that write to RTDB directly (admin
+// quick face-register, senior self-KYC, employee KYC review).
+// ============================================================
+app.post('/api/supabase/sync-senior', requireAuth, async (req, res) => {
+    const { uid, faceImage, idFrontImage, idBackImage, medCertImage, medCertName, medCertType, healthCondition } = req.body || {};
+    const actor = req.authUser;
+    try {
+        if (!uid) return res.status(400).json({ success: false, message: 'uid is required.' });
+        if (actor.role === 'senior' && actor.uid !== uid) {
+            return res.status(403).json({ success: false, message: 'You may only sync your own record.' });
+        }
+        if (!['admin', 'employee', 'senior'].includes(actor.role)) {
+            return res.status(403).json({ success: false, message: 'Insufficient permissions.' });
+        }
+        if (!seniorStore.isSyncEnabled()) {
+            return res.status(503).json({
+                success: false,
+                disabled: true,
+                message: 'Supabase is not configured. Ask the administrator to set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.'
+            });
+        }
+
+        const snap = await admin.database().ref(`users/${uid}`).once('value');
+        if (!snap.exists()) return res.status(404).json({ success: false, message: 'Senior record not found.' });
+        const user = snap.val();
+        if (user.role && user.role !== 'senior') {
+            return res.status(400).json({ success: false, message: 'Only senior citizen records are mirrored to Supabase.' });
+        }
+
+        const face = faceImage || user.kycFaceImage || user.faceImage || null;
+        const front = idFrontImage || user.kycIdFrontImage || null;
+        const back = idBackImage || user.kycIdBackImage || null;
+        const result = await seniorStore.syncSeniorRecord(uid, user, face, front, back, { medCertImage: medCertImage || user.kycMedCertImage || null, medCertName: medCertName || user.kycMedCertName || '', medCertType: medCertType || user.kycMedCertType || '', healthCondition: healthCondition || user.healthCondition || '' });
+        await writeAuditLog('SUPABASE_SENIOR_MIRRORED', actor, uid, null,
+            `Senior record mirrored to Supabase (face: ${result.facePath || 'none'}, ID front: ${result.idFrontPath || 'none'}, ID back: ${result.idBackPath || 'none'}, med-cert: ${result.medCertPath || 'none'})`);
+        // Persist the durable storage path back to the Firebase record so the
+        // medical certification can still be re-opened by staff later, even
+        // after the bulky base64 copy (kycMedCertImage) is removed.
+        if (result && result.medCertPath && result.medCertPath !== user.kycMedCertPath) {
+            try {
+                await admin.database().ref(`users/${uid}/kycMedCertPath`).set(result.medCertPath);
+            } catch (e) { console.warn('kycMedCertPath write-back skipped:', e.message); }
+        }
+        res.json({ success: true, facePath: result.facePath, idFrontPath: result.idFrontPath, idBackPath: result.idBackPath, medCertPath: result.medCertPath, migratedHint: result.migratedHint || null, message: 'Senior record mirrored to Supabase (personal info + face + health + Senior ID back-to-back + med cert).' + (result.migratedHint ? ' Note: ' + result.migratedHint : '') });
+    } catch (error) {
+        console.error('Supabase senior mirror error:', error);
+        res.status(500).json({ success: false, message: 'Failed to mirror senior record to Supabase: ' + error.message });
     }
 });
 // ============================================================
@@ -756,7 +1294,6 @@ app.get('/api/health-records/:uid', requireAuth, async (req, res) => {
         res.status(500).json({ success: false, message: 'Failed to load health records.' });
     }
 });
-
 
 // Basic routing for pages
 
@@ -895,7 +1432,6 @@ async function seedHealthConsentDefaults() {
     } catch (e) { /* non-fatal */ }
 }
 seedHealthConsentDefaults();
-
 
 // --- API: Delete a health record (admin/staff only; soft-audit-logged) ---
 app.delete('/api/health-records/:uid/:recordId', requireAuth, requireRole('admin', 'employee'), async (req, res) => {
@@ -1135,6 +1671,444 @@ app.get('/api/senior-id/view/:uid/:docId', requireAuth, async (req, res) => {
 });
 
 // ============================================================
+// Health / Illness Management with Medical Certification
+// (Supabase Storage — private bucket "medical-certifications")
+//
+// Firebase RTDB stays the single source of truth:
+//   users/{uid}/healthReports/{reportId}  -> every health update submitted by a senior
+//   users/{uid}/healthManagement          -> OSCA staff decision (health + priority)
+//   users/{uid}/healthCondition           -> the OFFICIAL condition shown app-wide
+//
+// Flow (per thesis: the system assists, staff decide):
+//   1) A VERIFIED senior citizen opens Profile -> "Update Health", describes
+//      the illness and uploads a medical certification. The file is stored in
+//      the PRIVATE bucket folder pending/{uid}/... and the metadata is written
+//      to Firebase with status "Pending Review".
+//   2) OSCA staff open the employee "Senior Illness & Priority Management"
+//      section, view the senior account + the uploaded certification through a
+//      short-lived signed URL, then give the FINAL human decision: the updated
+//      health condition and the priority level (Low / Medium / High) based on
+//      the illness. Accepted certifications move to reviewed/{uid}/...,
+//      rejected ones are deleted so no sensitive data is kept needlessly.
+//   3) The senior is notified in the portal about the decision.
+// Every access is permission-checked and written to auditLogs (RA 10173).
+// ============================================================
+
+const HEALTH_PRIORITY_LEVELS = ['Low', 'Medium', 'High'];
+
+/** Health Update / illness management is available to VERIFIED seniors only. */
+function isVerifiedSeniorAccount(user) {
+    return !!(user && (user.kycStatus === 'Verified' || user.kycVerifiedAt));
+}
+
+function medicalVaultDisabled(res) {
+    return res.status(503).json({ success: false, message: 'Medical certification vault is not configured. Ask the administrator to set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.' });
+}
+
+/** Tells the senior (portal notification) that a decision was made on their health update. */
+async function notifySeniorHealthDecision(uid, title, description) {
+    try {
+        const now = Date.now();
+        await admin.database().ref(`users/${uid}/notifications/notif_${now}`).set({
+            title: title,
+            description: description,
+            createdAt: now
+        });
+    } catch (e) {
+        console.warn('Health decision notification skipped:', e.message);
+    }
+}
+
+// --- API: Senior submits a Health Update with a medical certification ---
+// Verified senior accounts ONLY (the feature is locked for unverified accounts).
+app.post('/api/health-report/submit', requireAuth, requireRole('senior'), async (req, res) => {
+    const { illness, description, fileName, mimeType, fileBase64 } = req.body;
+    const actor = req.authUser;
+    try {
+        if (!isVerifiedSeniorAccount(actor)) {
+            await writeAuditLog('HEALTH_UPDATE_BLOCKED_UNVERIFIED', actor, actor.uid, null,
+                `Blocked health update — KYC status: ${actor.kycStatus || 'Not Verified'}`);
+            return res.status(403).json({
+                success: false,
+                message: 'Only verified senior accounts can send a health update. Please complete the "Get Verified" step first.'
+            });
+        }
+
+        const illnessText = String(illness || '').trim().slice(0, 160);
+        if (!illnessText) {
+            return res.status(400).json({ success: false, message: 'Please describe your illness or health condition.' });
+        }
+
+        const wantsFile = !!(fileName || mimeType || fileBase64);
+        if (wantsFile && (!fileName || !mimeType || !fileBase64)) {
+            return res.status(400).json({
+                success: false,
+                message: 'The medical certification upload is incomplete — fileName, mimeType and fileBase64 are all required.'
+            });
+        }
+
+        const reportRef = admin.database().ref(`users/${actor.uid}/healthReports`).push();
+        const reportId = reportRef.key;
+
+        // 1) Store the physical certification first (private bucket, pending folder)
+        let storagePath = null;
+        let fileSize = null;
+        if (wantsFile) {
+            if (!medicalVault.isVaultEnabled()) return medicalVaultDisabled(res);
+            const decoded = medicalVault.decodeDocumentPayload(mimeType, fileBase64);
+            if (decoded.error) return res.status(400).json({ success: false, message: decoded.error });
+            fileSize = decoded.buffer.length;
+            storagePath = medicalVault.buildStoragePath('pending', actor.uid, reportId, fileName);
+            await medicalVault.uploadDocument(storagePath, decoded.buffer, mimeType);
+        }
+
+        // 2) Mirror the metadata into Firebase (source of truth)
+        await reportRef.set({
+            reportId: reportId,
+            uid: actor.uid,
+            name: actor.name || 'Senior Citizen',
+            seniorId: actor.seniorId || null,
+            illness: illnessText,
+            description: String(description || '').trim().slice(0, 1500) || null,
+            hasCertification: wantsFile,
+            fileName: wantsFile ? String(fileName).slice(0, 120) : null,
+            mimeType: wantsFile ? mimeType : null,
+            size: fileSize,
+            storagePath: storagePath,
+            folder: wantsFile ? 'pending' : null,
+            status: 'Pending Review',
+            submittedBy: actor.uid,
+            submittedByName: actor.name || actor.email || 'Senior Citizen',
+            submittedAt: Date.now()
+        });
+
+        // The self-reported update is queued for staff review. The OFFICIAL health
+        // condition + priority are only changed by OSCA staff after reviewing the
+        // medical certification (human decision, not automatic).
+        await admin.database().ref(`users/${actor.uid}`).update({
+            healthConditionLatest: illnessText,
+            healthUpdatePending: true,
+            healthUpdateLastSubmittedAt: Date.now()
+        });
+
+        await writeAuditLog('HEALTH_REPORT_SUBMITTED', actor, actor.uid, reportId,
+            `Health update submitted — illness: ${illnessText}${wantsFile ? ' (medical certification attached)' : ' (no certification attached)'}`);
+
+        res.json({
+            success: true,
+            message: 'Health update submitted. OSCA staff will review your medical certification and update your health record.',
+            reportId: reportId
+        });
+    } catch (error) {
+        console.error('Health report submit error:', error);
+        res.status(500).json({ success: false, message: 'Failed to submit the health update: ' + error.message });
+    }
+});
+
+// --- API: View a medical certification (owner senior or OSCA staff) via short-lived signed URL ---
+app.get('/api/health-report/view/:uid/:reportId', requireAuth, async (req, res) => {
+    const { uid, reportId } = req.params;
+    const actor = req.authUser;
+    try {
+        const isOwner = actor.uid === uid;
+        const isStaff = actor.role === 'admin' || actor.role === 'employee';
+        if (!isOwner && !isStaff) {
+            return res.status(403).json({ success: false, message: 'You are not allowed to view this medical certification.' });
+        }
+        if (!medicalVault.isVaultEnabled()) return medicalVaultDisabled(res);
+
+        const snap = await admin.database().ref(`users/${uid}/healthReports/${reportId}`).once('value');
+        if (!snap.exists()) return res.status(404).json({ success: false, message: 'Health update not found.' });
+        const report = snap.val();
+        if (!report.storagePath) {
+            return res.status(404).json({ success: false, message: 'This health update has no stored medical certification.' });
+        }
+
+        const signedUrl = await medicalVault.createViewLink(report.storagePath);
+
+        // Privacy compliance: record WHO viewed WHICH senior's certification and WHEN.
+        await writeAuditLog('VIEW_MEDICAL_CERTIFICATION', actor, uid, reportId,
+            `Viewed "${report.fileName || 'medical certification'}" (${report.status})`);
+
+        res.json({
+            success: true,
+            signedUrl: signedUrl,
+            expiresIn: medicalVault.SIGNED_URL_TTL_SECONDS,
+            report: {
+                reportId: report.reportId || reportId,
+                illness: report.illness || null,
+                description: report.description || null,
+                fileName: report.fileName || null,
+                mimeType: report.mimeType || null,
+                size: report.size || null,
+                status: report.status || 'Pending Review',
+                submittedAt: report.submittedAt || null
+            }
+        });
+    } catch (error) {
+        console.error('Medical certification view error:', error);
+        res.status(500).json({ success: false, message: 'Failed to open the medical certification: ' + error.message });
+    }
+});
+
+// --- View the KYC medical certification (owner or staff) -------------------
+// The certification a senior uploaded during identity verification. Two
+// copies may exist:
+//   1) kycMedCertImage (data URL) in Firebase — removed after a rejection,
+//   2) the durable file mirrored to the private Supabase "seniors" bucket,
+//      pointed to by users/{uid}/kycMedCertPath.
+// Staff (and the owning senior) can always re-open the document as long as a
+// copy is available; access is permission-checked and audited (RA 10173).
+app.get('/api/kyc-medcert/view/:uid', requireAuth, async (req, res) => {
+    const { uid } = req.params;
+    const actor = req.authUser;
+    try {
+        const isOwner = actor.uid === uid;
+        const isStaff = actor.role === 'admin' || actor.role === 'employee';
+        if (!isOwner && !isStaff) {
+            return res.status(403).json({ success: false, message: 'You are not allowed to view this medical certification.' });
+        }
+
+        const snap = await admin.database().ref(`users/${uid}`).once('value');
+        if (!snap.exists()) return res.status(404).json({ success: false, message: 'Senior record not found.' });
+        const user = snap.val();
+        if (user.role && user.role !== 'senior') {
+            return res.status(404).json({ success: false, message: 'No medical certification was submitted for this account.' });
+        }
+
+        // Preferred: the durable private-bucket copy (survives verification).
+        if (user.kycMedCertPath) {
+            if (!seniorStore.isSyncEnabled()) {
+                return res.status(503).json({ success: false, message: 'Supabase is not configured, so the stored medical certification cannot be opened.' });
+            }
+            try {
+                const signedUrl = await seniorStore.createMedCertViewLink(user.kycMedCertPath);
+                await writeAuditLog('VIEW_KYC_MEDICAL_CERTIFICATION', actor, uid, null,
+                    `Viewed KYC medical certification "${user.kycMedCertName || 'file'}" (stored copy)`);
+                return res.json({
+                    success: true,
+                    viewUrl: signedUrl,
+                    source: 'storage',
+                    expiresIn: seniorStore.MED_CERT_VIEW_TTL_SECONDS,
+                    file: { name: user.kycMedCertName || 'Medical certification', mimeType: user.kycMedCertType || null }
+                });
+            } catch (e) {
+                console.error('KYC med-cert signed URL failed:', e.message);
+                // fall through to the inline copy below, if any
+            }
+        }
+
+        // Fallback: the inline data-URL copy in Firebase (pending submissions).
+        if (user.kycMedCertImage) {
+            await writeAuditLog('VIEW_KYC_MEDICAL_CERTIFICATION', actor, uid, null,
+                `Viewed KYC medical certification "${user.kycMedCertName || 'file'}" (submitted copy)`);
+            return res.json({
+                success: true,
+                viewUrl: user.kycMedCertImage,
+                source: 'inline',
+                file: { name: user.kycMedCertName || 'Medical certification', mimeType: user.kycMedCertType || null }
+            });
+        }
+
+        return res.status(404).json({
+            success: false,
+            message: 'No medical certification is available for this senior. The senior can submit one through the portal, or ask OSCA staff to check the archive copy.'
+        });
+    } catch (error) {
+        console.error('KYC medical certification view error:', error);
+        res.status(500).json({ success: false, message: 'Failed to open the medical certification: ' + error.message });
+    }
+});
+
+// --- API: Staff review of a submitted health update / medical certification ---
+// decision = 'Reviewed'  -> accept the certification, SET the official health condition
+//                           and the priority level (Low / Medium / High) based on the illness
+// decision = 'Rejected'  -> the certification is deleted and the senior is notified
+app.post('/api/health-report/:uid/:reportId/review', requireAuth, requireRole('admin', 'employee'), async (req, res) => {
+    const { uid, reportId } = req.params;
+    const { decision, healthCondition, illnessDetails, priorityLevel, notes } = req.body;
+    const actor = req.authUser;
+    try {
+        if (!['Reviewed', 'Rejected'].includes(decision)) {
+            return res.status(400).json({ success: false, message: 'decision must be either "Reviewed" or "Rejected".' });
+        }
+
+        const reportRef = admin.database().ref(`users/${uid}/healthReports/${reportId}`);
+        const snap = await reportRef.once('value');
+        if (!snap.exists()) return res.status(404).json({ success: false, message: 'Health update not found.' });
+        const report = snap.val();
+        if (report.status !== 'Pending Review') {
+            return res.status(409).json({ success: false, message: `This health update was already reviewed (${report.status}).` });
+        }
+
+        const actorName = actor.name || actor.email || 'OSCA Staff';
+        const cleanNotes = String(notes || '').trim().slice(0, 500) || null;
+
+        if (decision === 'Rejected') {
+            // Rejected: remove the sensitive file entirely, keep only the audit trail.
+            if (report.storagePath) {
+                try { await medicalVault.deleteDocument(report.storagePath); }
+                catch (e) { console.warn('Medical certification delete skipped:', e.message); }
+            }
+            await reportRef.update({
+                status: 'Rejected',
+                folder: null,
+                storagePath: null,
+                reviewedBy: actor.uid,
+                reviewedByName: actorName,
+                reviewedAt: Date.now(),
+                reviewNotes: cleanNotes
+            });
+            await admin.database().ref(`users/${uid}`).update({
+                healthUpdatePending: false,
+                healthUpdateLastReviewedAt: Date.now()
+            });
+            await writeAuditLog('HEALTH_REPORT_REJECTED', actor, uid, reportId,
+                `Medical certification rejected${cleanNotes ? ' — ' + cleanNotes : ''}`);
+            await notifySeniorHealthDecision(uid, 'Health Update Needs Attention',
+                `Your health update${report.illness ? ' for "' + report.illness + '"' : ''} was not accepted by OSCA staff.${cleanNotes ? ' Reason: ' + cleanNotes : ''} You may submit a clearer certification.`);
+            return res.json({ success: true, message: 'Health update rejected. The senior has been notified.' });
+        }
+
+        // ── Accepted: the staff decision becomes the official health + priority ──
+        const priority = String(priorityLevel || '');
+        if (!HEALTH_PRIORITY_LEVELS.includes(priority)) {
+            return res.status(400).json({ success: false, message: 'A priority level (Low, Medium or High) is required to complete the review.' });
+        }
+        const condition = String(healthCondition || report.illness || '').trim().slice(0, 160);
+        if (!condition) {
+            return res.status(400).json({ success: false, message: 'Please provide the updated health condition / illness of the senior.' });
+        }
+        const details = String(illnessDetails || report.description || '').trim().slice(0, 1500) || null;
+
+        // Move the accepted certification to the reviewed folder BEFORE touching Firebase.
+        let reviewedPath = report.storagePath || null;
+        if (report.storagePath) {
+            const target = medicalVault.buildStoragePath('reviewed', uid, reportId, report.fileName || 'certification');
+            try {
+                await medicalVault.moveDocument(report.storagePath, target);
+                reviewedPath = target;
+            } catch (e) {
+                console.warn('Medical certification move skipped (metadata still updated):', e.message);
+            }
+        }
+
+        const now = Date.now();
+        await reportRef.update({
+            status: 'Reviewed',
+            folder: reviewedPath ? 'reviewed' : null,
+            storagePath: reviewedPath,
+            reviewedIllness: condition,
+            reviewedDetails: details,
+            priorityLevel: priority,
+            reviewNotes: cleanNotes,
+            reviewedBy: actor.uid,
+            reviewedByName: actorName,
+            reviewedAt: now
+        });
+
+        await admin.database().ref(`users/${uid}`).update({
+            healthCondition: condition,
+            illnessDetails: details || condition,
+            illnessReportedAt: now,
+            healthUpdatePending: false,
+            healthUpdateLastReviewedAt: now,
+            staffPriorityLevel: priority,
+            staffPrioritySetAt: now,
+            staffPrioritySetBy: actor.uid,
+            staffPrioritySetByName: actorName,
+            staffPriorityNotes: cleanNotes,
+            'healthManagement/healthCondition': condition,
+            'healthManagement/illnessDetails': details,
+            'healthManagement/priorityLevel': priority,
+            'healthManagement/prioritySource': 'OSCA staff review (medical certification)',
+            'healthManagement/prioritySetAt': now,
+            'healthManagement/prioritySetBy': actor.uid,
+            'healthManagement/prioritySetByName': actorName,
+            'healthManagement/lastReportId': reportId,
+            'healthManagement/lastReviewedAt': now,
+            'healthManagement/lastReviewedByName': actorName,
+            'healthManagement/notes': cleanNotes
+        });
+
+        await writeAuditLog('HEALTH_REPORT_REVIEWED', actor, uid, reportId,
+            `Medical certification reviewed — health: ${condition}, priority: ${priority}${cleanNotes ? ' — ' + cleanNotes : ''}`);
+        await notifySeniorHealthDecision(uid, 'Health Update Recorded',
+            `OSCA staff updated your health record from your submitted certification. Condition: ${condition}. Priority level: ${priority}.`);
+
+        res.json({
+            success: true,
+            message: `Health record updated successfully — priority set to ${priority}.`,
+            healthCondition: condition,
+            priorityLevel: priority
+        });
+    } catch (error) {
+        console.error('Health report review error:', error);
+        res.status(500).json({ success: false, message: 'Failed to review the health update: ' + error.message });
+    }
+});
+
+// --- API: Staff directly updates a senior's health + priority (no pending certification needed) ---
+app.post('/api/health-management/:uid/update', requireAuth, requireRole('admin', 'employee'), async (req, res) => {
+    const { uid } = req.params;
+    const { healthCondition, illnessDetails, priorityLevel, notes } = req.body;
+    const actor = req.authUser;
+    try {
+        const priority = String(priorityLevel || '');
+        if (!HEALTH_PRIORITY_LEVELS.includes(priority)) {
+            return res.status(400).json({ success: false, message: 'priorityLevel must be one of: ' + HEALTH_PRIORITY_LEVELS.join(', ') + '.' });
+        }
+        const condition = String(healthCondition || '').trim().slice(0, 160);
+        if (!condition) {
+            return res.status(400).json({ success: false, message: 'Please provide the senior\'s health condition / illness.' });
+        }
+
+        const userSnap = await admin.database().ref(`users/${uid}`).once('value');
+        if (!userSnap.exists() || userSnap.val().role !== 'senior') {
+            return res.status(404).json({ success: false, message: 'Senior citizen account not found.' });
+        }
+        const user = userSnap.val();
+        if (!isVerifiedSeniorAccount(user)) {
+            return res.status(403).json({ success: false, message: 'Illness management is only available for verified senior accounts.' });
+        }
+
+        const actorName = actor.name || actor.email || 'OSCA Staff';
+        const details = String(illnessDetails || '').trim().slice(0, 1500) || null;
+        const cleanNotes = String(notes || '').trim().slice(0, 500) || null;
+        const now = Date.now();
+
+        await admin.database().ref(`users/${uid}`).update({
+            healthCondition: condition,
+            illnessDetails: details || condition,
+            illnessReportedAt: now,
+            staffPriorityLevel: priority,
+            staffPrioritySetAt: now,
+            staffPrioritySetBy: actor.uid,
+            staffPrioritySetByName: actorName,
+            staffPriorityNotes: cleanNotes,
+            'healthManagement/healthCondition': condition,
+            'healthManagement/illnessDetails': details,
+            'healthManagement/priorityLevel': priority,
+            'healthManagement/prioritySource': 'OSCA staff (manual illness assessment)',
+            'healthManagement/prioritySetAt': now,
+            'healthManagement/prioritySetBy': actor.uid,
+            'healthManagement/prioritySetByName': actorName,
+            'healthManagement/notes': cleanNotes
+        });
+
+        await writeAuditLog('HEALTH_PRIORITY_UPDATED', actor, uid, null,
+            `Health updated manually — condition: ${condition}, priority: ${priority}${cleanNotes ? ' — ' + cleanNotes : ''}`);
+        await notifySeniorHealthDecision(uid, 'Health Record Updated',
+            `OSCA staff updated your health record. Condition: ${condition}. Priority level: ${priority}.`);
+
+        res.json({ success: true, message: `Health updated — priority set to ${priority}.`, healthCondition: condition, priorityLevel: priority });
+    } catch (error) {
+        console.error('Health management update error:', error);
+        res.status(500).json({ success: false, message: 'Failed to update the health record: ' + error.message });
+    }
+});
+
+// ============================================================
 // QR-Based Digital ID Verification, Benefits Eligibility
 // Engine, Duplicate-Claim Prevention & Budget Management.
 //
@@ -1150,7 +2124,6 @@ app.get('/api/senior-id/view/:uid/:docId', requireAuth, async (req, res) => {
 //    automatically — each claim is recorded by an authenticated
 //    staff member and written to the audit trail.
 // ============================================================
-const crypto = require('crypto');
 
 const BENEFIT_TYPES = [
     'Monthly Social Pension',
@@ -1160,6 +2133,19 @@ const BENEFIT_TYPES = [
     'Financial Assistance',
     'Food / Relief Goods'
 ];
+
+function computeAgeFromDob(dob) {
+    if (!dob) return null;
+    const birthDate = new Date(dob);
+    if (isNaN(birthDate.getTime())) return null;
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const m = today.getMonth() - birthDate.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+    }
+    return age >= 0 ? age : null;
+}
 
 function currentClaimPeriod() {
     const d = new Date();
@@ -1215,12 +2201,25 @@ function evaluateEligibility(user) {
 app.get('/api/senior/verification-token', requireAuth, requireRole('senior'), async (req, res) => {
     try {
         const actor = req.authUser;
-        if (actor.verificationToken) {
-            return res.json({ success: true, token: actor.verificationToken });
+        let token = actor.verificationToken;
+        if (!token) {
+            token = generateVerificationToken();
+            await admin.database().ref(`users/${actor.uid}/verificationToken`).set(token);
         }
-        const token = generateVerificationToken();
-        await admin.database().ref(`users/${actor.uid}/verificationToken`).set(token);
-        res.json({ success: true, token: token });
+        // Full offline-verifiable payload scanned by staff: SC1|<uid>|<token>
+        const payload = `SC1|${actor.uid}|${token}`;
+        let qrImage = null;
+        try {
+            qrImage = await QRCode.toDataURL(payload, {
+                errorCorrectionLevel: 'M',
+                margin: 2,
+                width: 320,
+                color: { dark: '#0f172a', light: '#ffffff' }
+            });
+        } catch (qrErr) {
+            console.error('QR render error:', qrErr.message); // non-fatal: payload still returned
+        }
+        res.json({ success: true, token, payload, qrImage });
     } catch (error) {
         console.error('Verification token error:', error);
         res.status(500).json({ success: false, message: 'Failed to prepare your QR digital ID.' });
@@ -1233,7 +2232,7 @@ app.post('/api/verify-qr', requireAuth, requireRole('admin', 'employee'), async 
         const raw = String(req.body.code || '').trim();
         let uid = null, token = null;
 
-        // Accept the exact QR payload SC1|uid|token, or a manual Senior ID lookup.
+        // Accept the exact QR payload SC1|uid|token, or a manual Senior ID / Account lookup.
         if (/^SC1\|/.test(raw)) {
             const parts = raw.split('|');
             if (parts.length !== 3) return res.status(400).json({ success: false, message: 'Malformed QR code payload.' });
@@ -1242,12 +2241,26 @@ app.post('/api/verify-qr', requireAuth, requireRole('admin', 'employee'), async 
         } else if (raw) {
             const snap = await admin.database().ref('users').orderByChild('role').equalTo('senior').once('value');
             const users = snap.val() || {};
-            const target = Object.entries(users).find(([, u]) =>
-                String(u.seniorId || '').trim().toUpperCase() === raw.toUpperCase());
-            if (!target) return res.status(404).json({ success: false, message: `No senior citizen found with Senior ID "${raw}".` });
+            const cleanRaw = raw.trim().toUpperCase();
+            const cleanRawDigits = cleanRaw.replace(/\D/g, '');
+            const target = Object.entries(users).find(([k, u]) => {
+                if (!u) return false;
+                const sId = String(u.seniorId || '').trim().toUpperCase();
+                const oscaId = String(u.oscaId || '').trim().toUpperCase();
+                const email = String(u.email || '').trim().toUpperCase();
+                const sIdDigits = sId.replace(/\D/g, '');
+                return (
+                    k === raw ||
+                    sId === cleanRaw ||
+                    oscaId === cleanRaw ||
+                    email === cleanRaw ||
+                    (cleanRawDigits && cleanRawDigits.length >= 4 && sIdDigits === cleanRawDigits)
+                );
+            });
+            if (!target) return res.status(404).json({ success: false, message: `No senior citizen found with ID or account "${raw}".` });
             uid = target[0];
         } else {
-            return res.status(400).json({ success: false, message: 'Scan a QR code or enter a Senior ID.' });
+            return res.status(400).json({ success: false, message: 'Scan a QR code or enter a Senior ID or account.' });
         }
 
         const userSnap = await admin.database().ref(`users/${uid}`).once('value');
@@ -1271,19 +2284,45 @@ app.post('/api/verify-qr', requireAuth, requireRole('admin', 'employee'), async 
             .sort((a, b) => (b.releasedAt || 0) - (a.releasedAt || 0)).slice(0, 5)
             .map(c => ({ benefitType: c.benefitType, amount: c.amount, period: c.period, releasedAt: c.releasedAt, releasedByName: c.releasedByName }));
 
+        // Priority calculation
+        const priority = priorityEngine.computePriority(user);
+        const ageVal = computeAgeFromDob(user.dob) ?? (user.age ? Number(user.age) : null);
+
+        // Verification status determination (Verified, Pending, or Not yet verified)
+        let verificationStatus = 'Not yet verified';
+        if (user.kycStatus === 'Verified' || user.kycVerifiedAt) {
+            verificationStatus = 'Verified';
+        } else if (user.kycStatus === 'Pending' || user.status === 'Pending') {
+            verificationStatus = 'Pending';
+        } else if (user.kycStatus === 'Rejected') {
+            verificationStatus = 'Rejected';
+        } else {
+            verificationStatus = 'Not yet verified';
+        }
+
+        const fullAddress = user.address || [user.barangay, user.city, user.province].filter(Boolean).join(', ') || user.barangay || 'N/A';
+
         await writeAuditLog('QR_VERIFY_SUCCESS', req.authUser, uid, null,
-            `Verified identity via QR${token ? '' : '/Senior ID'} — eligibility: ${eligibility.eligible ? 'ELIGIBLE' : 'NOT ELIGIBLE'}`);
+            `Verified identity via QR${token ? '' : '/Senior ID'} — verification: ${verificationStatus}, eligibility: ${eligibility.eligible ? 'ELIGIBLE' : 'NOT ELIGIBLE'}`);
 
         res.json({
             success: true,
             senior: {
                 uid: uid,
-                name: user.name,
-                seniorId: user.seniorId || '',
-                barangay: user.barangay || '',
-                age: computeAgeFromDob(user.dob),
+                name: user.name || [user.firstName, user.lastName].filter(Boolean).join(' ') || 'Senior Citizen',
+                email: user.email || 'N/A',
+                seniorId: user.seniorId || 'N/A',
+                address: fullAddress,
+                barangay: user.barangay || 'N/A',
+                dob: user.dob || 'N/A',
+                age: ageVal,
+                priorityLevel: priority.level || 'Low',
+                priorityScore: priority.score || 0,
+                priorityBreakdown: priority.breakdown || {},
+                priorityReasons: priority.reasons || [],
+                verificationStatus: verificationStatus,
                 lifeStatus: user.lifeStatus || 'Active',
-                accountStatus: user.status || 'Unknown',
+                accountStatus: user.status || 'Active',
                 kycStatus: user.kycStatus || (user.kycVerifiedAt ? 'Verified' : 'Not verified'),
                 healthCondition: user.healthCondition || user.condition || user.preExistingConditions || 'None reported'
             },
@@ -1295,6 +2334,139 @@ app.post('/api/verify-qr', requireAuth, requireRole('admin', 'employee'), async 
     } catch (error) {
         console.error('Verify QR error:', error);
         res.status(500).json({ success: false, message: 'Verification failed: ' + error.message });
+    }
+});
+
+// --- Helper: notify all staff (admin + employee) in-app (Automated Notifications) ---
+async function notifyStaff(title, description) {
+    try {
+        const snap = await admin.database().ref('users').once('value');
+        const users = snap.val() || {};
+        const now = Date.now();
+        const updates = {};
+        Object.entries(users).forEach(([uid, u]) => {
+            if (u && (u.role === 'admin' || u.role === 'employee')) {
+                updates[`users/${uid}/notifications/notif_${now}_${uid.slice(0, 6)}`] = {
+                    title,
+                    description,
+                    createdAt: now
+                };
+            }
+        });
+        if (Object.keys(updates).length > 0) {
+            await admin.database().ref().update(updates);
+        }
+    } catch (err) {
+        console.error('notifyStaff error:', err.message); // non-fatal
+    }
+}
+
+// --- API: Senior submits an assistance/benefit request from the portal ---
+// Replaces the legacy direct-to-RTDB claim push. Server enforces identity
+// (uid is ALWAYS the authenticated senior), duplicate-request prevention
+// per service + claim period, sanitization, and audit logging.
+app.post('/api/claims/request', requireAuth, requireRole('senior'), async (req, res) => {
+    const { serviceType, formData, urgentRequest } = req.body;
+    const actor = req.authUser;
+    try {
+        if (!serviceType) return res.status(400).json({ success: false, message: 'serviceType is required.' });
+        const type = String(serviceType).trim();
+        if (type.length > 80) return res.status(400).json({ success: false, message: 'serviceType is too long.' });
+
+        // ── KYC GATE: only fully Verified seniors may request services ──
+        // Re-check the live record (not the token claims) so a Pending /
+        // Not Verified / Rejected account can never submit a request,
+        // even via direct API calls.
+        const freshUserSnap = await admin.database().ref(`users/${actor.uid}`).once('value');
+        const freshUser = freshUserSnap.val() || {};
+        if (freshUser.kycStatus !== 'Verified') {
+            await writeAuditLog('CLAIM_REQUEST_BLOCKED_UNVERIFIED', actor, actor.uid, null,
+                `Blocked ${type} request — KYC status: ${freshUser.kycStatus || 'Not Verified'}`);
+            return res.status(403).json({
+                success: false,
+                message: 'Your account is not verified yet. Please complete the Get Verified process before requesting services.'
+            });
+        }
+
+        // Sanitize formData: plain string map only, bounded sizes.
+        const cleanForm = {};
+        if (formData && typeof formData === 'object' && !Array.isArray(formData)) {
+            const keys = Object.keys(formData).slice(0, 40);
+            for (const k of keys) {
+                const safeKey = String(k).replace(/[^a-zA-Z0-9_ -]/g, '').slice(0, 60);
+                if (!safeKey) continue;
+                const v = formData[k];
+                if (Array.isArray(v)) {
+                    cleanForm[safeKey] = v.slice(0, 6).map(x => String(x).slice(0, 300));
+                } else if (v !== null && v !== undefined && typeof v !== 'object') {
+                    cleanForm[safeKey] = String(v).slice(0, 2000);
+                }
+            }
+        }
+
+        const serviceMonth = currentClaimPeriod();
+
+        // Duplicate-request prevention: same senior + same service + same period.
+        const dupSnap = await admin.database().ref('claims')
+            .orderByChild('uid').equalTo(actor.uid).once('value');
+        const existing = dupSnap.val() || {};
+        const dup = Object.entries(existing).find(([, c]) => (
+            c && (c.serviceType === type) && (c.serviceMonth === serviceMonth) &&
+            ['Pending', 'Processing', 'Approved'].includes(c.status)
+        ));
+        if (dup) {
+            await writeAuditLog('CLAIM_REQUEST_DUPLICATE', actor, actor.uid, dup[0],
+                `Duplicate ${type} request for ${serviceMonth}`);
+            return res.status(409).json({
+                success: false,
+                message: `You already have a ${type} request for ${serviceMonth} (status: ${dup[1].status}). Please wait for it to be processed.`
+            });
+        }
+
+        const claimRef = admin.database().ref('claims').push();
+        const claim = {
+            uid: actor.uid,                    // legacy field used by staff dashboards
+            seniorUid: actor.uid,              // canonical field
+            applicantName: actor.name || actor.email || 'Senior Citizen',
+            serviceType: type,
+            serviceMonth,
+            formData: cleanForm,
+            // Emergency Urgent Request flag ("Request only" toggle on the senior form)
+            urgentRequest: urgentRequest === true || urgentRequest === 'true',
+            urgentRequestedAt: (urgentRequest === true || urgentRequest === 'true') ? Date.now() : null,
+            status: 'Pending',
+            source: 'senior-portal',
+            createdAt: Date.now()
+        };
+        await claimRef.set(claim);
+
+        await writeAuditLog('CLAIM_REQUEST_SUBMITTED', actor, actor.uid, claimRef.key,
+            `Submitted ${type} request for ${serviceMonth}`);
+        await notifyStaff('New Assistance Request',
+            `${claim.applicantName} submitted a ${type} request. Please review it in the Process tab.`);
+
+        res.json({ success: true, message: 'Request submitted.', claimId: claimRef.key });
+    } catch (error) {
+        console.error('Claim request error:', error);
+        res.status(500).json({ success: false, message: 'Failed to submit request.' });
+    }
+});
+
+// --- API: Senior lists own submitted claims ---
+app.get('/api/claims/request/mine', requireAuth, requireRole('senior'), async (req, res) => {
+    const actor = req.authUser;
+    try {
+        const snap = await admin.database().ref('claims')
+            .orderByChild('uid').equalTo(actor.uid).once('value');
+        const items = snap.val() || {};
+        const claims = Object.entries(items)
+            .map(([id, c]) => ({ id, ...c }))
+            .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+            .slice(0, 50);
+        res.json({ success: true, claims });
+    } catch (error) {
+        console.error('My claims error:', error);
+        res.status(500).json({ success: false, message: 'Failed to load your requests.' });
     }
 });
 
@@ -1491,6 +2663,143 @@ async function seedHealthCenters() {
 }
 seedHealthCenters();
 
+// ============================================================
+// Phase 2: Barangay Mapping
+// Per thesis: each senior is mapped to a barangay; the system
+// tracks distribution by barangay for reports and budget.
+// Shares the same app, admin, and writeAuditLog as server.js.
+// ============================================================
+
+// --- API: Get barangays (any authenticated; optional filter) ---
+app.get('/api/barangays', requireAuth, async (req, res) => {
+    const { region, district } = req.query;
+    try {
+        const snap = await admin.database().ref('barangays').once('value');
+        let items = snap.val() || {};
+        items = Object.entries(items).map(([k, v]) => ({ id: k, ...v }));
+        if (region) items = items.filter(b => (b.region || '').toLowerCase() === region.toLowerCase());
+        if (district) items = items.filter(b => (b.district || '').toLowerCase() === district.toLowerCase());
+        items.sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+        res.json({ success: true, barangays: items });
+    } catch (error) {
+        console.error('Barangays error:', error);
+        res.status(500).json({ success: false, message: 'Failed to load barangays.' });
+    }
+});
+
+// --- API: Get barangay mapping of a senior (senior: own; staff: any) ---
+app.get('/api/barangay/:uid', requireAuth, async (req, res) => {
+    const { uid } = req.params;
+    const actor = req.authUser;
+    try {
+        if (actor.role === 'senior' && actor.uid !== uid) {
+            return res.status(403).json({ success: false, message: 'You may only view your own barangay mapping.' });
+        }
+        const snap = await admin.database().ref(`users/${uid}`).once('value');
+        if (!snap.exists()) return res.status(404).json({ success: false, message: 'User not found.' });
+        const user = snap.val();
+        const bId = user.barangayId || null;
+        let barangay = null;
+        if (bId) {
+            const bSnap = await admin.database().ref(`barangays/${bId}`).once('value');
+            if (bSnap.exists()) barangay = { id: bId, ...bSnap.val() };
+        }
+        res.json({
+            success: true,
+            uid,
+            barangayId: bId,
+            barangay,
+            mappedAt: user.barangayMappedAt || null,
+            mappedByName: user.barangayMappedByName || null
+        });
+    } catch (error) {
+        console.error('Barangay mapping error:', error);
+        res.status(500).json({ success: false, message: 'Failed to load barangay mapping.' });
+    }
+});
+
+// --- API: Map senior to barangay (admin/staff only) ---
+app.post('/api/barangay/map', requireAuth, requireRole('admin', 'employee'), async (req, res) => {
+    const { uid, barangayId } = req.body;
+    const actor = req.authUser;
+    try {
+        if (!uid || !barangayId) return res.status(400).json({ success: false, message: 'uid and barangayId are required.' });
+        const userSnap = await admin.database().ref(`users/${uid}`).once('value');
+        if (!userSnap.exists()) return res.status(404).json({ success: false, message: 'Senior citizen not found.' });
+        const bSnap = await admin.database().ref(`barangays/${barangayId}`).once('value');
+        if (!bSnap.exists()) return res.status(400).json({ success: false, message: 'Barangay not found.' });
+
+        await admin.database().ref(`users/${uid}`).update({
+            barangayId,
+            barangayMappedAt: Date.now(),
+            barangayMappedBy: actor.uid,
+            barangayMappedByName: actor.name || actor.email || ''
+        });
+        await writeAuditLog('BARANGAY_MAPPED', actor, uid, barangayId,
+            `Mapped senior to barangay ${bSnap.val().name || barangayId}`);
+        res.json({ success: true, message: 'Barangay mapping updated.' });
+    } catch (error) {
+        console.error('Map barangay error:', error);
+        res.status(500).json({ success: false, message: 'Failed to map barangay.' });
+    }
+});
+
+// --- API: Count seniors per barangay (admin/staff only; for reports) ---
+app.get('/api/barangay/counts', requireAuth, requireRole('admin', 'employee'), async (req, res) => {
+    try {
+        const [usersSnap, barangaysSnap] = await Promise.all([
+            admin.database().ref('users').once('value'),
+            admin.database().ref('barangays').once('value')
+        ]);
+        const users = usersSnap.val() || {};
+        const counts = {};
+        Object.values(users).forEach(u => {
+            if (u.role !== 'senior') return;
+            const key = u.barangayId || 'unmapped';
+            counts[key] = (counts[key] || 0) + 1;
+        });
+        const barangays = barangaysSnap.val() || {};
+        const result = Object.entries(barangays).map(([id, b]) => ({
+            id,
+            name: b.name,
+            seniors: counts[id] || 0
+        }));
+        if (counts['unmapped']) result.push({ id: null, name: '(Unmapped)', seniors: counts['unmapped'] });
+        result.sort((a, b) => b.seniors - a.seniors);
+        res.json({ success: true, counts: result });
+    } catch (error) {
+        console.error('Barangay counts error:', error);
+        res.status(500).json({ success: false, message: 'Failed to compute barangay counts.' });
+    }
+});
+
+// --- API: Add / update barangay (admin only) ---
+app.post('/api/barangays', requireAuth, requireRole('admin'), async (req, res) => {
+    const { id, name, region, district, municipality, population } = req.body;
+    const actor = req.authUser;
+    try {
+        if (!id || !name) return res.status(400).json({ success: false, message: 'id and name are required.' });
+        const safeId = String(id).replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 60);
+        const data = {
+            name: String(name).slice(0, 80),
+            region: String(region || '').slice(0, 60),
+            district: String(district || '').slice(0, 60),
+            municipality: String(municipality || '').slice(0, 80),
+            population: Number(population) || 0,
+            updatedBy: actor.uid,
+            updatedByName: actor.name || actor.email || '',
+            updatedAt: Date.now()
+        };
+        await admin.database().ref(`barangays/${safeId}`).set(data);
+        await writeAuditLog('BARANGAY_SAVED', actor, null, safeId,
+            `Saved barangay ${data.name} (${safeId})`);
+        res.json({ success: true, message: 'Barangay saved.', id: safeId });
+    } catch (error) {
+        console.error('Save barangay error:', error);
+        res.status(500).json({ success: false, message: 'Failed to save barangay.' });
+    }
+});
+
 // Basic routing for pages
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
@@ -1498,6 +2807,10 @@ app.get('/', (req, res) => {
 
 app.get('/signup', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'signup.html'));
+});
+
+app.get('/reset-password', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'reset-password.html'));
 });
 
 app.get('/admin', (req, res) => {
@@ -1512,8 +2825,1231 @@ app.get('/senior', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'views', 'senior.html'));
 });
 
+app.get('/user-manual', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'user-manual.html'));
+});
 
+app.get('/reactivate', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'reactivate.html'));
+});
 
+// ============================================================
+// Queue / Appointment / Attendance system (Phase 1 - Server)
+// Per thesis:
+//  - Seniors book appointments -> get queue number
+//  - Frontend shows queue position
+//  - Employee reviews requests in Health Records: Pending -> Approved / Declined
+//  - Attendance: Approved / Pending -> Attended / Missed / Rescheduled
+//  - All operations RBAC-guarded + audit logged
+// Firebase RTDB = single source of truth
+// ============================================================
+
+// --- API: List queues (admin/staff only; optional filter) ---
+app.get('/api/queues', requireAuth, requireRole('admin', 'employee'), async (req, res) => {
+    const { status, date } = req.query;
+    const actor = req.authUser;
+    try {
+        const ref = admin.database().ref('queue');
+        const snap = await ref.once('value');
+        const all = snap.val() || {};
+        const result = [];
+        Object.values(all).forEach(q => {
+            if (status && q.status !== status) return;
+            if (date && new Date(q.scheduledAt).toDateString() !== new Date(date).toDateString()) return;
+            result.push(q);
+        });
+        result.sort((a, b) => (a.scheduledAt || 0) - (b.scheduledAt || 0));
+        res.json({ success: true, queues: result });
+    } catch (error) {
+        console.error('List queues error:', error);
+        res.status(500).json({ success: false, message: 'Failed to load queues.' });
+    }
+});
+
+// --- API: Get my queue slots (senior: own; staff: all) ---
+app.get('/api/queues/:uid', requireAuth, async (req, res) => {
+    const { uid } = req.params;
+    const actor = req.authUser;
+    try {
+        if (actor.role === 'senior' && actor.uid !== uid) {
+            return res.status(403).json({ success: false, message: 'You may only view your own queue slots.' });
+        }
+        const ref = admin.database().ref('queue');
+        const snap = await ref.orderByChild('uid').equalTo(uid).once('value');
+        const items = snap.val() || {};
+        const result = Object.values(items)
+            .map(q => ({ id: q.id, ...q }))
+            .sort((a, b) => (a.scheduledAt || 0) - (b.scheduledAt || 0));
+        res.json({ success: true, queues: result });
+    } catch (error) {
+        console.error('My queues error:', error);
+        res.status(500).json({ success: false, message: 'Failed to load your queue slots.' });
+    }
+});
+
+// --- API: Book a queue appointment (senior only; own) ---
+app.post('/api/queue/book', requireAuth, requireRole('senior'), async (req, res) => {
+    const { date, time, service, note } = req.body;
+    const actor = req.authUser;
+    try {
+        if (!date || !time) return res.status(400).json({ success: false, message: 'date and time are required.' });
+        const scheduledAt = new Date(`${date}T${time}`).getTime();
+        if (isNaN(scheduledAt)) return res.status(400).json({ success: false, message: 'Invalid date/time format.' });
+        if (scheduledAt < Date.now()) return res.status(400).json({ success: false, message: 'Cannot book a past appointment.' });
+
+        // One customer = one active/pending appointment at a time.
+        // A senior with a Pending/Rescheduled booking must reschedule or
+        // cancel it before booking a new one.
+        const existingSnap = await admin.database().ref('queue')
+            .orderByChild('uid').equalTo(actor.uid)
+            .once('value');
+        if (existingSnap.exists()) {
+            const existing = existingSnap.val();
+            const conflict = Object.values(existing).find(q => {
+                return !['Cancelled', 'Missed', 'Attended', 'Declined'].includes(q.status);
+            });
+            if (conflict) {
+                const hint = conflict.status === 'Approved'
+                    ? 'It is already approved and can no longer be rescheduled — cancel it first if you wish to book a new schedule.'
+                    : 'Please reschedule or cancel it before booking a new one.';
+                return res.status(409).json({ success: false, message: `You still have an active booking (${conflict.queueNumber || 'no queue no.'} — ${conflict.service || 'visit'} on ${conflict.date || ''} at ${conflict.time || ''}). ${hint}` });
+            }
+        }
+
+        // Automatic queue number generation — sequential per visit date
+        // Format: Q-YYYYMMDD-### (e.g. Q-20260913-001). Keeps lines short,
+        // avoids overcrowding, and makes the daily schedule trivial to manage.
+        const dateKey = String(date).replace(/-/g, '');
+        const daySnap = await admin.database().ref('queue')
+            .orderByChild('date').equalTo(date)
+            .once('value');
+        const dayCount = daySnap.exists() ? Object.keys(daySnap.val()).length : 0;
+        const seq = String(dayCount + 1).padStart(3, '0');
+        const queueNumber = `Q-${dateKey}-${seq}`;
+
+        const id = admin.database().ref('queue').push().key;
+        const queueRef = admin.database().ref(`queue/${id}`);
+        const queueData = {
+            id,
+            uid: actor.uid,
+            name: actor.name || actor.email || '',
+            seniorId: actor.seniorId || 'N/A',
+            date,
+            time,
+            scheduledAt,
+            queueNumber,
+            service: String(service || 'General Consultation').slice(0, 80),
+            note: String(note || '').slice(0, 300),
+            status: 'Pending',
+            createdAt: Date.now(),
+            createdBy: actor.uid
+        };
+        await queueRef.set(queueData);
+        await writeAuditLog('QUEUE_APPOINTMENT_BOOKED', actor, actor.uid, id,
+            `Booked ${queueData.service} on ${date} at ${time} — queue ${queueNumber}`);
+
+        // Attendance tracking starts at Pending; mirror a health log + notification
+        // so the senior sees the booking without polling.
+        try {
+            const logKey = 'log_' + Date.now();
+            await admin.database().ref(`users/${actor.uid}/health/logs/${logKey}`).set({
+                type: 'checkup',
+                title: 'Appointment Booked',
+                description: `${queueData.service} on ${date} at ${time}. Queue ${queueNumber}.`,
+                createdAt: Date.now(),
+                status: 'Pending'
+            });
+            const notifKey = 'notif_' + Date.now();
+            await admin.database().ref(`users/${actor.uid}/notifications/${notifKey}`).set({
+                title: 'Appointment Booked — Queue ' + queueNumber,
+                description: `Your ${queueData.service} visit is set for ${date} at ${time}. Queue number ${queueNumber}. Please arrive 15 minutes early.`,
+                createdAt: Date.now()
+            });
+        } catch (e) { console.warn('Booking mirror skipped:', e.message); }
+
+        res.json({ success: true, message: 'Appointment booked.', queueId: id, queueNumber });
+    } catch (error) {
+        console.error('Book queue error:', error);
+        res.status(500).json({ success: false, message: 'Failed to book appointment.' });
+    }
+});
+
+// --- API: Reschedule my queue appointment (senior only; own) ---
+// Seniors pick a new slot; status is reset to Pending and the booking is
+// marked Rescheduled so staff can see the history in the daily schedule.
+app.put('/api/queue/:queueId/reschedule', requireAuth, requireRole('senior'), async (req, res) => {
+    const { queueId } = req.params;
+    const { date, time } = req.body;
+    const actor = req.authUser;
+    try {
+        if (!date || !time) return res.status(400).json({ success: false, message: 'date and time are required.' });
+        const scheduledAt = new Date(`${date}T${time}`).getTime();
+        if (isNaN(scheduledAt)) return res.status(400).json({ success: false, message: 'Invalid date/time format.' });
+        if (scheduledAt < Date.now()) return res.status(400).json({ success: false, message: 'Cannot reschedule to a past slot.' });
+        const queueRef = admin.database().ref(`queue/${queueId}`);
+        const snap = await queueRef.once('value');
+        if (!snap.exists()) return res.status(404).json({ success: false, message: 'Queue appointment not found.' });
+        const q = snap.val();
+        if (q.uid !== actor.uid) return res.status(403).json({ success: false, message: 'You may only reschedule your own appointments.' });
+        if (['Attended', 'Missed', 'Declined', 'Cancelled', 'Approved'].includes(q.status)) {
+            const msg = q.status === 'Declined'
+                ? 'This appointment request was declined and can no longer be rescheduled. Please book a new schedule.'
+                : q.status === 'Cancelled'
+                    ? 'This appointment was cancelled and can no longer be rescheduled. Please book a new schedule.'
+                    : q.status === 'Approved'
+                        ? 'This appointment is already approved and can no longer be rescheduled. You may cancel it and book a new schedule.'
+                        : 'Completed visits can no longer be rescheduled.';
+            return res.status(400).json({ success: false, message: msg });
+        }
+
+        // Regenerate the queue number for the new visit date so each daily
+        // schedule stays sequential.
+        const dateKey = String(date).replace(/-/g, '');
+        const daySnap = await admin.database().ref('queue')
+            .orderByChild('date').equalTo(date)
+            .once('value');
+        const seq = String((daySnap.exists() ? Object.keys(daySnap.val()).length : 0) + 1).padStart(3, '0');
+
+        await queueRef.update({
+            date, time, scheduledAt,
+            queueNumber: `Q-${dateKey}-${seq}`,
+            status: 'Rescheduled',
+            rescheduledAt: Date.now(),
+            updatedBy: actor.uid,
+            updatedAt: Date.now()
+        });
+        await writeAuditLog('QUEUE_APPOINTMENT_RESCHEDULED', actor, actor.uid, queueId,
+            `Rescheduled to ${date} at ${time}`);
+        res.json({ success: true, message: 'Appointment rescheduled.', queueNumber: `Q-${dateKey}-${seq}` });
+    } catch (error) {
+        console.error('Reschedule queue error:', error);
+        res.status(500).json({ success: false, message: 'Failed to reschedule appointment.' });
+    }
+});
+
+// --- API: Cancel my queue appointment (senior only; own; pending only) ---
+app.delete('/api/queue/:queueId', requireAuth, requireRole('senior'), async (req, res) => {
+    const { queueId } = req.params;
+    const actor = req.authUser;
+    try {
+        const queueRef = admin.database().ref(`queue/${queueId}`);
+        const snap = await queueRef.once('value');
+        if (!snap.exists()) return res.status(404).json({ success: false, message: 'Queue appointment not found.' });
+        const q = snap.val();
+        if (q.uid !== actor.uid) return res.status(403).json({ success: false, message: 'You may only cancel your own appointments.' });
+        if (!['Pending', 'Rescheduled', 'Approved'].includes(q.status)) return res.status(400).json({ success: false, message: 'Only pending, rescheduled or approved appointments can be cancelled.' });
+
+        await writeAuditLog('QUEUE_APPOINTMENT_CANCELLED', actor, actor.uid, queueId,
+            `Cancelled appointment on ${q.date} at ${q.time}`);
+        await queueRef.remove();
+
+        res.json({ success: true, message: 'Appointment cancelled.' });
+    } catch (error) {
+        console.error('Cancel queue error:', error);
+        res.status(500).json({ success: false, message: 'Failed to cancel appointment.' });
+    }
+});
+
+// --- API: Update queue status (admin/staff only) ---
+// Employees may Approve / Decline senior-booked checkup appointments from the
+// Health Records tab. Approving/Declining mirrors a notification + health log
+// entry so the senior instantly sees the decision on their portal.
+app.put('/api/queue/:queueId/status', requireAuth, requireRole('admin', 'employee'), async (req, res) => {
+    const { queueId } = req.params;
+    const { status, attendedAt, note } = req.body;
+    const actor = req.authUser;
+    try {
+        const validStatuses = ['Pending', 'Attended', 'Missed', 'Rescheduled', 'Approved', 'Declined'];
+        if (!validStatuses.includes(status)) return res.status(400).json({ success: false, message: 'Invalid status. Allowed: ' + validStatuses.join(', ') });
+
+        const queueRef = admin.database().ref(`queue/${queueId}`);
+        const snap = await queueRef.once('value');
+        if (!snap.exists()) return res.status(404).json({ success: false, message: 'Queue appointment not found.' });
+        const q = snap.val();
+
+        const updates = { status };
+        if (status === 'Attended') updates.attendedAt = attendedAt ? Number(attendedAt) : Date.now();
+        if (note) updates.decisionNote = String(note).slice(0, 300);
+        updates.updatedBy = actor.uid;
+        updates.updatedByName = actor.name || actor.email || '';
+        updates.updatedAt = Date.now();
+        // Preserve WHO made each type of decision. updatedByName is overwritten on
+        // every status change, so these per-decision fields keep the full history
+        // (e.g. who approved a visit even after another staff member marks it done).
+        if (status === 'Approved') {
+            updates.approvedBy = actor.uid;
+            updates.approvedByName = actor.name || actor.email || '';
+            updates.approvedAt = Date.now();
+        } else if (status === 'Declined') {
+            updates.declinedBy = actor.uid;
+            updates.declinedByName = actor.name || actor.email || '';
+            updates.declinedAt = Date.now();
+        } else if (status === 'Attended') {
+            updates.attendedBy = actor.uid;
+            updates.attendedByName = actor.name || actor.email || '';
+        }
+
+        await queueRef.update(updates);
+
+        const auditAction = status === 'Approved' ? 'QUEUE_APPOINTMENT_APPROVED'
+            : status === 'Declined' ? 'QUEUE_APPOINTMENT_DECLINED'
+            : 'QUEUE_APPOINTMENT_STATUS_UPDATED';
+        await writeAuditLog(auditAction, actor, q.uid, queueId,
+            `Marked as ${status} (service: ${q.service || 'N/A'})`);
+
+        // Mirror the decision to the senior (notification + health log) so it
+        // shows up on their portal without polling — same pattern as booking.
+        if (status === 'Approved' || status === 'Declined' || status === 'Attended') {
+            try {
+                const now = Date.now();
+                const approved = status === 'Approved';
+                const attended = status === 'Attended';
+                const reason = updates.decisionNote ? ` Reason: ${updates.decisionNote}` : '';
+                const mirrorTitle = attended ? 'Visit Completed ✅'
+                    : approved ? 'Appointment Approved ✅' : 'Appointment Declined ❌';
+                const mirrorDesc = attended
+                    ? `Your ${q.service || 'appointment'} visit on ${q.date} at ${q.time} (queue ${q.queueNumber || 'N/A'}) has been marked as done. You may now book a new appointment anytime.`
+                    : approved
+                        ? `Your ${q.service || 'appointment'} request on ${q.date} at ${q.time} (queue ${q.queueNumber || 'N/A'}) has been approved. Please arrive 15 minutes early.${reason}`
+                        : `Sorry, your ${q.service || 'appointment'} request on ${q.date} at ${q.time} (queue ${q.queueNumber || 'N/A'}) was declined. You may book a new schedule anytime.${reason}`;
+                await admin.database().ref(`users/${q.uid}/notifications/notif_${now}`).set({
+                    title: mirrorTitle,
+                    description: mirrorDesc,
+                    createdAt: now
+                });
+                await admin.database().ref(`users/${q.uid}/health/logs/log_${now}`).set({
+                    type: 'checkup',
+                    title: attended ? 'Visit Completed' : approved ? 'Appointment Approved' : 'Appointment Declined',
+                    description: attended
+                        ? `${q.service || 'Appointment'} on ${q.date} at ${q.time} completed. Queue ${q.queueNumber || 'N/A'}.`
+                        : `${q.service || 'Appointment'} on ${q.date} at ${q.time}. Queue ${q.queueNumber || 'N/A'}.${reason}`,
+                    createdAt: now,
+                    status
+                });
+            } catch (e) { console.warn('Decision mirror skipped:', e.message); }
+        }
+
+        res.json({ success: true, message: `Appointment marked as ${status}.` });
+    } catch (error) {
+        console.error('Update queue status error:', error);
+        res.status(500).json({ success: false, message: 'Failed to update appointment status.' });
+    }
+});
+
+// --- API: Log attendance (admin/staff only) ---
+app.post('/api/attendance/log', requireAuth, requireRole('admin', 'employee'), async (req, res) => {
+    const { queueId, status, attendedAt, note } = req.body;
+    const actor = req.authUser;
+    try {
+        if (!queueId) return res.status(400).json({ success: false, message: 'queueId is required.' });
+        const validStatuses = ['Attended', 'Missed', 'Rescheduled'];
+        if (!validStatuses.includes(status)) return res.status(400).json({ success: false, message: 'Invalid status. Allowed: ' + validStatuses.join(', ') });
+
+        const queueRef = admin.database().ref(`queue/${queueId}`);
+        const snap = await queueRef.once('value');
+        if (!snap.exists()) return res.status(404).json({ success: false, message: 'Queue appointment not found.' });
+        const q = snap.val();
+
+        const attRef = admin.database().ref('attendance').push();
+        const attData = {
+            id: attRef.key,
+            queueId,
+            uid: q.uid,
+            name: q.name || '',
+            date: q.date,
+            time: q.time,
+            service: q.service || '',
+            status,
+            attendedAt: attendedAt ? Number(attendedAt) : Date.now(),
+            note: String(note || '').slice(0, 300),
+            recordedBy: actor.uid,
+            recordedByName: actor.name || actor.email || '',
+            recordedAt: Date.now()
+        };
+        await attRef.set(attData);
+
+        const queueUpdates = { status };
+        if (status === 'Attended') queueUpdates.attendedAt = Date.now();
+        queueUpdates.updatedBy = actor.uid;
+        queueUpdates.updatedByName = actor.name || actor.email || '';
+        queueUpdates.updatedAt = Date.now();
+        // Per-decision actor tracking (see PUT /api/queue/:queueId/status)
+        if (status === 'Attended') {
+            queueUpdates.attendedBy = actor.uid;
+            queueUpdates.attendedByName = actor.name || actor.email || '';
+        }
+        await queueRef.update(queueUpdates);
+
+        await writeAuditLog('ATTENDANCE_LOGGED', actor, q.uid, attRef.key,
+            `Attendance logged: ${status} for ${q.service || 'appointment'} on ${q.date}`);
+
+        res.json({ success: true, message: 'Attendance logged.', attendanceId: attRef.key });
+    } catch (error) {
+        console.error('Log attendance error:', error);
+        res.status(500).json({ success: false, message: 'Failed to log attendance.' });
+    }
+});
+
+// --- API: Get announcements (all authenticated; read-only) ---
+app.get('/api/announcements', requireAuth, async (req, res) => {
+    const actor = req.authUser;
+    try {
+        const snap = await admin.database().ref('announcements').once('value');
+        const items = snap.val() || {};
+        const result = Object.values(items)
+            .sort((a, b) => (b.postedAt || 0) - (a.postedAt || 0))
+            .slice(0, 50);
+        await writeAuditLog('ANNOUNCEMENTS_VIEWED', actor, null, null,
+            `Viewed announcements (${result.length} items)`);
+        res.json({ success: true, announcements: result });
+    } catch (error) {
+        console.error('Announcements error:', error);
+        res.status(500).json({ success: false, message: 'Failed to load announcements.' });
+    }
+});
+
+// --- API: Create announcement (admin only) ---
+app.post('/api/announcements', requireAuth, requireRole('admin'), async (req, res) => {
+    const { title, message, priority, target } = req.body;
+    const actor = req.authUser;
+    try {
+        if (!title || !message) return res.status(400).json({ success: false, message: 'title and message are required.' });
+        const id = admin.database().ref('announcements').push().key;
+        const data = {
+            id,
+            title: String(title).slice(0, 120),
+            message: String(message).slice(0, 2000),
+            priority: ['high', 'normal', 'low'].includes(priority) ? priority : 'normal',
+            target: target || 'all',
+            postedBy: actor.uid,
+            postedByName: actor.name || actor.email || '',
+            postedAt: Date.now()
+        };
+        await admin.database().ref(`announcements/${id}`).set(data);
+        await writeAuditLog('ANNOUNCEMENT_POSTED', actor, null, id,
+            `Posted announcement: ${data.title}`);
+
+        try {
+            await admin.database().ref(`notifications/ann_${id}`).set({
+                type: 'announcement',
+                title: data.title,
+                message: data.message,
+                priority: data.priority,
+                target: data.target,
+                createdAt: Date.now()
+            });
+        } catch (e) { /* non-fatal */ }
+
+        res.json({ success: true, message: 'Announcement posted.', announcementId: id });
+    } catch (error) {
+        console.error('Create announcement error:', error);
+        res.status(500).json({ success: false, message: 'Failed to post announcement.' });
+    }
+});
+
+// --- API: Get attendance log (admin/staff only) ---
+app.get('/api/attendance', requireAuth, requireRole('admin', 'employee'), async (req, res) => {
+    const { status, date } = req.query;
+    const actor = req.authUser;
+    try {
+        const ref = admin.database().ref('attendance');
+        const snap = await ref.once('value');
+        const all = snap.val() || {};
+        const result = [];
+        Object.values(all).forEach(a => {
+            if (status && a.status !== status) return;
+            if (date && new Date(a.attendedAt).toDateString() !== new Date(date).toDateString()) return;
+            result.push(a);
+        });
+        result.sort((a, b) => (b.attendedAt || 0) - (a.attendedAt || 0));
+        res.json({ success: true, attendance: result });
+    } catch (error) {
+        console.error('Attendance list error:', error);
+        res.status(500).json({ success: false, message: 'Failed to load attendance.' });
+    }
+});
+
+// ============================================================
+// Phase 2: Benefits Backend - Eligibility Engine
+// Barangay Mapping + Budget Guard + QR Verification
+// Per thesis requirements
+// Firebase RTDB = single source of truth
+// ============================================================
+
+// --- Helper: verify QR token ---
+function verifyQRToken(token) {
+    if (!token || typeof token !== 'string') return null;
+    const parts = token.split('|');
+    if (parts.length !== 3) return null;
+    const [prefix, uid, hash] = parts;
+    if (prefix !== 'SC1') return null;
+    const secret = process.env.QR_SECRET || 'silvercare-default-secret';
+    const expected = crypto.createHash('sha256')
+        .update(uid + '|' + secret)
+        .digest('hex').slice(0, 16);
+    if (hash !== expected) return null;
+    return { uid, valid: true };
+}
+
+// --- Helper: check duplicate claim ---
+async function checkDuplicateClaim(seniorUid, benefitId, serviceMonth) {
+    const ref = admin.database().ref('claims');
+    const snap = await ref.orderByChild('seniorUid').equalTo(seniorUid).once('value');
+    const claims = snap.val() || {};
+    for (const key of Object.keys(claims)) {
+        const c = claims[key];
+        if (c.benefitId === benefitId && c.serviceMonth === serviceMonth &&
+            (c.status === 'Approved' || c.status === 'Processing')) {
+            return { duplicate: true, claimId: key, existing: c };
+        }
+    }
+    return { duplicate: false };
+}
+
+// --- Helper: get benefit budget ---
+async function getBenefitBudget(benefitId) {
+    const snap = await admin.database().ref('benefits/' + benefitId).once('value');
+    if (!snap.exists()) return null;
+    return snap.val();
+}
+
+// --- Helper: check budget available ---
+async function checkBudgetAvailable(benefitId, serviceMonth) {
+    const benefit = await getBenefitBudget(benefitId);
+    if (!benefit) return { available: false, reason: 'Benefit not found' };
+    const claimedSnap = await admin.database().ref('claims')
+        .orderByChild('benefitId').equalTo(benefitId).once('value');
+    let claimed = 0;
+    const claims = claimedSnap.val() || {};
+    for (const key of Object.keys(claims)) {
+        const c = claims[key];
+        const cMonth = c.serviceMonth || (c.claimYear + '-' + String(c.serviceMonth || 0).padStart(2, '0'));
+        if (c.status === 'Approved' && cMonth === serviceMonth) {
+            claimed += (Number(c.amount) || 0);
+        }
+    }
+    const budget = Number(benefit.monthlyBudget) || 0;
+    const remaining = Math.max(0, budget - claimed);
+    return { available: remaining > 0, claimed, budget, remaining };
+}
+
+// --- API: Generate QR code for senior ---
+app.post('/api/qr/generate', requireAuth, requireRole('admin', 'employee'), async (req, res) => {
+    const { uid } = req.body;
+    const actor = req.authUser;
+    try {
+        if (!uid) return res.status(400).json({ success: false, message: 'uid is required.' });
+        const userSnap = await admin.database().ref('users/' + uid).once('value');
+        if (!userSnap.exists()) return res.status(404).json({ success: false, message: 'Senior not found.' });
+        
+        const existingSnap = await admin.database().ref('qrCodes/' + uid).once('value');
+        if (existingSnap.exists()) {
+            const existing = existingSnap.val();
+            res.json({ success: true, qrCode: existing, message: 'QR code already exists for this senior.' });
+            return;
+        }
+        
+        const secret = process.env.QR_SECRET || 'silvercare-default-secret';
+        const hash = crypto.createHash('sha256')
+            .update(uid + '|' + secret)
+            .digest('hex').slice(0, 16);
+        
+        const qrCode = {
+            uid: uid,
+            token: 'SC1|' + uid + '|' + hash,
+            generatedBy: actor.uid,
+            generatedByName: actor.name || actor.email || '',
+            generatedAt: Date.now(),
+            lastUsed: null,
+            usageCount: 0
+        };
+        
+        await admin.database().ref('qrCodes/' + uid).set(qrCode);
+        await writeAuditLog('QR_GENERATED', actor, uid, null, 'QR code generated for senior citizen');
+        
+        res.json({ success: true, qrCode: qrCode, message: 'QR code generated successfully.' });
+    } catch (error) {
+        console.error('QR generation error:', error);
+        res.status(500).json({ success: false, message: 'Failed to generate QR code.' });
+    }
+});
+
+// --- API: Verify QR code ---
+app.post('/api/qr/verify', requireAuth, requireRole('admin', 'employee'), async (req, res) => {
+    const { token } = req.body;
+    const actor = req.authUser;
+    try {
+        if (!token) return res.status(400).json({ success: false, message: 'token is required.' });
+        
+        const result = verifyQRToken(token);
+        if (!result) {
+            await writeAuditLog('QR_VERIFY_FAILED', actor, null, null, 'Invalid QR token verification attempt');
+            return res.status(400).json({ success: false, message: 'Invalid QR code.', verified: false });
+        }
+        
+        const qrSnap = await admin.database().ref('qrCodes/' + result.uid).once('value');
+        if (!qrSnap.exists()) {
+            await writeAuditLog('QR_VERIFY_FAILED', actor, result.uid, null, 'QR code not found in system');
+            return res.status(404).json({ success: false, message: 'QR code not found in system.', verified: false });
+        }
+        
+        const qrCode = qrSnap.val();
+        const userSnap = await admin.database().ref('users/' + result.uid).once('value');
+        const user = userSnap.val() || {};
+        
+        qrCode.lastUsed = Date.now();
+        qrCode.usageCount = (qrCode.usageCount || 0) + 1;
+        await admin.database().ref('qrCodes/' + result.uid).update(qrCode);
+        
+        await writeAuditLog('QR_VERIFIED', actor, result.uid, null, 'QR code verified successfully');
+        
+        res.json({
+            success: true,
+            verified: true,
+            senior: {
+                uid: result.uid,
+                name: user.name || '',
+                age: user.age || null,
+                status: user.status || 'Unknown',
+                barangayId: user.barangayId || null,
+                benefitsEligible: user.benefitsEligible || false,
+                registrationDate: user.registrationDate || null
+            },
+            qrCode: {
+                token: qrCode.token,
+                usageCount: qrCode.usageCount,
+                lastUsed: qrCode.lastUsed,
+                generatedAt: qrCode.generatedAt
+            }
+        });
+    } catch (error) {
+        console.error('QR verification error:', error);
+        res.status(500).json({ success: false, message: 'Failed to verify QR code.' });
+    }
+});
+
+// --- API: Check eligibility for benefits ---
+app.post('/api/eligibility/check', requireAuth, requireRole('admin', 'employee'), async (req, res) => {
+    const { uid, benefitId } = req.body;
+    const actor = req.authUser;
+    try {
+        if (!uid) return res.status(400).json({ success: false, message: 'uid is required.' });
+        
+        const userSnap = await admin.database().ref('users/' + uid).once('value');
+        if (!userSnap.exists()) return res.status(404).json({ success: false, message: 'Senior not found.' });
+        const user = userSnap.val();
+        
+        const eligibility = {
+            uid: uid,
+            name: user.name || '',
+            age: user.age || null,
+            status: user.status || 'Unknown',
+            barangayId: user.barangayId || null,
+            benefitsEligible: false,
+            eligibleBenefits: [],
+            ineligibleBenefits: [],
+            checkedAt: Date.now(),
+            checkedBy: actor.uid
+        };
+        
+        if (user.status !== 'Active') {
+            eligibility.reason = 'Senior status is not Active';
+            return res.json({ success: true, eligibility: eligibility });
+        }
+        
+        const benefitsSnap = await admin.database().ref('benefits').once('value');
+        const benefits = benefitsSnap.val() || {};
+        
+        for (const [bid, benefit] of Object.entries(benefits)) {
+            const b = benefit || {};
+            let eligible = true;
+            let reasons = [];
+            
+            if (b.ageMin && user.age && user.age < b.ageMin) {
+                eligible = false;
+                reasons.push('Age requirement not met (min: ' + b.ageMin + ')');
+            }
+            if (b.ageMax && user.age && user.age > b.ageMax) {
+                eligible = false;
+                reasons.push('Age requirement exceeded (max: ' + b.ageMax + ')');
+            }
+            
+            if (b.barangayId && user.barangayId !== b.barangayId) {
+                eligible = false;
+                reasons.push('Barangay mismatch');
+            }
+            
+            if (b.requiredDocuments && Array.isArray(b.requiredDocuments)) {
+                const docsRef = admin.database().ref('users/' + uid + '/documents');
+                const docsSnap = await docsRef.once('value');
+                const docs = docsSnap.val() || {};
+                const hasAllDocs = b.requiredDocuments.every(doc => docs[doc]);
+                if (!hasAllDocs) {
+                    eligible = false;
+                    const missing = b.requiredDocuments.filter(doc => !docs[doc]);
+                    reasons.push('Missing documents: ' + missing.join(', '));
+                }
+            }
+            
+            const result = {
+                benefitId: bid,
+                name: b.name || bid,
+                eligible: eligible,
+                reasons: reasons
+            };
+            
+            if (eligible) {
+                eligibility.eligibleBenefits.push(result);
+            } else {
+                eligibility.ineligibleBenefits.push(result);
+            }
+        }
+        
+        eligibility.benefitsEligible = eligibility.eligibleBenefits.length > 0;
+        
+        await writeAuditLog('ELIGIBILITY_CHECKED', actor, uid, null, 'Eligibility check completed for ' + eligibility.eligibleBenefits.length + ' benefits');
+        
+        res.json({ success: true, eligibility: eligibility });
+    } catch (error) {
+        console.error('Eligibility check error:', error);
+        res.status(500).json({ success: false, message: 'Failed to check eligibility.' });
+    }
+});
+
+// --- API: Submit claim for benefit ---
+app.post('/api/claims/submit', requireAuth, requireRole('admin', 'employee'), async (req, res) => {
+    const { uid, benefitId, serviceMonth, amount, documents, notes } = req.body;
+    const actor = req.authUser;
+    try {
+        if (!uid || !benefitId || !serviceMonth) {
+            return res.status(400).json({ success: false, message: 'uid, benefitId, and serviceMonth are required.' });
+        }
+        
+        const userSnap = await admin.database().ref('users/' + uid).once('value');
+        if (!userSnap.exists()) return res.status(404).json({ success: false, message: 'Senior not found.' });
+        const user = userSnap.val();
+        
+        const duplicateCheck = await checkDuplicateClaim(uid, benefitId, serviceMonth);
+        if (duplicateCheck.duplicate) {
+            await writeAuditLog('CLAIM_DUPLICATE', actor, uid, duplicateCheck.claimId, 
+                'Duplicate claim attempt for benefit ' + benefitId + ' month ' + serviceMonth);
+            return res.status(409).json({ 
+                success: false, 
+                message: 'Duplicate claim detected. Existing claim ID: ' + duplicateCheck.claimId,
+                duplicateClaimId: duplicateCheck.claimId 
+            });
+        }
+        
+        const budgetCheck = await checkBudgetAvailable(benefitId, serviceMonth);
+        if (!budgetCheck.available) {
+            await writeAuditLog('CLAIM_BUDGET_EXCEEDED', actor, uid, null, 
+                'Claim rejected - budget exceeded for benefit ' + benefitId + ' month ' + serviceMonth);
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Monthly budget exceeded for this benefit.',
+                budgetInfo: budgetCheck 
+            });
+        }
+        
+        const claimRef = admin.database().ref('claims').push();
+        const claimId = claimRef.key;
+        
+        const claimData = {
+            id: claimId,
+            uid: uid,
+            beneficiaryName: user.name || '',
+            benefitId: benefitId,
+            benefitName: '',
+            serviceMonth: serviceMonth,
+            claimYear: parseInt(serviceMonth.split('-')[0]) || new Date().getFullYear(),
+            amount: Number(amount) || 0,
+            documents: documents || {},
+            notes: notes || '',
+            status: 'Processing',
+            submittedBy: actor.uid,
+            submittedByName: actor.name || actor.email || '',
+            submittedAt: Date.now(),
+            processedBy: null,
+            processedByName: null,
+            processedAt: null,
+            approvalNotes: null,
+            rejectionReason: null
+        };
+        
+        const benefitSnap = await admin.database().ref('benefits/' + benefitId).once('value');
+        if (benefitSnap.exists()) {
+            claimData.benefitName = (benefitSnap.val() || {}).name || benefitId;
+        }
+        
+        await claimRef.set(claimData);
+        
+        await writeAuditLog('CLAIM_SUBMITTED', actor, uid, claimId, 
+            'Claim submitted for benefit ' + benefitId);
+        
+        res.json({ 
+            success: true, 
+            message: 'Claim submitted successfully.', 
+            claimId: claimId,
+            status: 'Processing'
+        });
+    } catch (error) {
+        console.error('Claim submission error:', error);
+        res.status(500).json({ success: false, message: 'Failed to submit claim.' });
+    }
+});
+
+// --- API: List claims ---
+app.get('/api/claims', requireAuth, requireRole('admin', 'employee'), async (req, res) => {
+    const { uid, benefitId, status, month, limit } = req.query;
+    const actor = req.authUser;
+    try {
+        const ref = admin.database().ref('claims');
+        const snap = await ref.once('value');
+        let claims = snap.val() || {};
+        claims = Object.entries(claims).map(([k, v]) => ({ id: k, ...v }));
+        
+        if (uid) claims = claims.filter(c => c.uid === uid);
+        if (benefitId) claims = claims.filter(c => c.benefitId === benefitId);
+        if (status) claims = claims.filter(c => c.status === status);
+        if (month) claims = claims.filter(c => c.serviceMonth === month);
+        
+        claims.sort((a, b) => (b.submittedAt || 0) - (a.submittedAt || 0));
+        
+        if (limit) claims = claims.slice(0, parseInt(limit));
+        
+        res.json({ success: true, claims: claims, total: claims.length });
+    } catch (error) {
+        console.error('Claims list error:', error);
+        res.status(500).json({ success: false, message: 'Failed to list claims.' });
+    }
+});
+
+// --- API: Get my claims (senior only) ---
+app.get('/api/claims/my', requireAuth, requireRole('senior'), async (req, res) => {
+    const actor = req.authUser;
+    try {
+        const ref = admin.database().ref('claims');
+        const snap = await ref.orderByChild('uid').equalTo(actor.uid).once('value');
+        const claims = snap.val() || {};
+        const result = Object.entries(claims).map(([k, v]) => ({ id: k, ...v }));
+        result.sort((a, b) => (b.submittedAt || 0) - (a.submittedAt || 0));
+        
+        await writeAuditLog('MY_CLAIMS_VIEWED', actor, actor.uid, null, 'Senior viewed own claims');
+        
+        res.json({ success: true, claims: result });
+    } catch (error) {
+        console.error('My claims error:', error);
+        res.status(500).json({ success: false, message: 'Failed to load your claims.' });
+    }
+});
+
+// --- API: Get claim details ---
+app.get('/api/claims/:claimId', requireAuth, requireRole('admin', 'employee'), async (req, res) => {
+    const { claimId } = req.params;
+    const actor = req.authUser;
+    try {
+        const snap = await admin.database().ref('claims/' + claimId).once('value');
+        if (!snap.exists()) return res.status(404).json({ success: false, message: 'Claim not found.' });
+        const claim = snap.val();
+        
+        await writeAuditLog('CLAIM_VIEWED', actor, claim.uid, claimId, 'Claim details viewed');
+        
+        res.json({ success: true, claim: claim });
+    } catch (error) {
+        console.error('Claim details error:', error);
+        res.status(500).json({ success: false, message: 'Failed to get claim details.' });
+    }
+});
+
+// --- API: Update claim status ---
+app.put('/api/claims/:claimId/status', requireAuth, requireRole('admin', 'employee'), async (req, res) => {
+    const { claimId } = req.params;
+    const { status, notes, rejectionReason } = req.body;
+    const actor = req.authUser;
+    try {
+        const validStatuses = ['Processing', 'Approved', 'Rejected', 'Paid'];
+        if (!validStatuses.includes(status)) {
+            return res.status(400).json({ success: false, message: 'Invalid status.' });
+        }
+        
+        const snap = await admin.database().ref('claims/' + claimId).once('value');
+        if (!snap.exists()) return res.status(404).json({ success: false, message: 'Claim not found.' });
+        const claim = snap.val();
+        
+        const updates = {
+            status: status,
+            processedBy: actor.uid,
+            processedByName: actor.name || actor.email || '',
+            processedAt: Date.now()
+        };
+        
+        if (status === 'Approved') {
+            updates.approvalNotes = notes || '';
+        } else if (status === 'Rejected') {
+            updates.rejectionReason = rejectionReason || notes || 'No reason provided';
+        }
+        
+        await admin.database().ref('claims/' + claimId).update(updates);
+        
+        await writeAuditLog('CLAIM_STATUS_UPDATED', actor, claim.uid, claimId, 
+            'Claim ' + status);
+        
+        res.json({ success: true, message: 'Claim status updated to ' + status });
+    } catch (error) {
+        console.error('Claim status update error:', error);
+        res.status(500).json({ success: false, message: 'Failed to update claim status.' });
+    }
+});
+
+// --- API: Get budget status for benefit ---
+app.get('/api/budget/:benefitId', requireAuth, requireRole('admin', 'employee'), async (req, res) => {
+    const { benefitId } = req.params;
+    const { month } = req.query;
+    const actor = req.authUser;
+    try {
+        const benefit = await getBenefitBudget(benefitId);
+        if (!benefit) return res.status(404).json({ success: false, message: 'Benefit not found.' });
+        
+        const serviceMonth = month || (new Date().getFullYear() + '-' + String(new Date().getMonth() + 1).padStart(2, '0'));
+        const budgetCheck = await checkBudgetAvailable(benefitId, serviceMonth);
+        
+        res.json({
+            success: true,
+            benefitId: benefitId,
+            benefitName: benefit.name || benefitId,
+            serviceMonth: serviceMonth,
+            monthlyBudget: benefit.monthlyBudget || 0,
+            totalClaimed: budgetCheck.claimed || 0,
+            remainingBudget: budgetCheck.remaining || 0,
+            budgetAvailable: budgetCheck.available
+        });
+    } catch (error) {
+        console.error('Budget check error:', error);
+        res.status(500).json({ success: false, message: 'Failed to check budget.' });
+    }
+});
+
+// --- API: Manage benefits (CRUD) ---
+app.get('/api/benefits', requireAuth, requireRole('admin', 'employee'), async (req, res) => {
+    const actor = req.authUser;
+    try {
+        const snap = await admin.database().ref('benefits').once('value');
+        const benefits = snap.val() || {};
+        const result = Object.entries(benefits).map(([k, v]) => ({ id: k, ...v }));
+        res.json({ success: true, benefits: result });
+    } catch (error) {
+        console.error('Benefits list error:', error);
+        res.status(500).json({ success: false, message: 'Failed to list benefits.' });
+    }
+});
+
+app.post('/api/benefits', requireAuth, requireRole('admin'), async (req, res) => {
+    const { id, name, description, amount, monthlyBudget, ageMin, ageMax, barangayId, requiredDocuments } = req.body;
+    const actor = req.authUser;
+    try {
+        if (!id || !name) return res.status(400).json({ success: false, message: 'id and name are required.' });
+        
+        const benefitData = {
+            id: id,
+            name: String(name).slice(0, 100),
+            description: String(description || '').slice(0, 500),
+            amount: Number(amount) || 0,
+            monthlyBudget: Number(monthlyBudget) || 0,
+            ageMin: Number(ageMin) || null,
+            ageMax: Number(ageMax) || null,
+            barangayId: barangayId || null,
+            requiredDocuments: Array.isArray(requiredDocuments) ? requiredDocuments : [],
+            createdAt: Date.now(),
+            createdBy: actor.uid,
+            createdByName: actor.name || actor.email || '',
+            updatedAt: Date.now(),
+            updatedBy: actor.uid,
+            updatedByName: actor.name || actor.email || ''
+        };
+        
+        await admin.database().ref('benefits/' + id).set(benefitData);
+        await writeAuditLog('BENEFIT_CREATED', actor, null, id, 'Benefit created: ' + name);
+        
+        res.json({ success: true, message: 'Benefit created successfully.', benefitId: id });
+    } catch (error) {
+        console.error('Benefit creation error:', error);
+        res.status(500).json({ success: false, message: 'Failed to create benefit.' });
+    }
+});
+
+app.put('/api/benefits/:benefitId', requireAuth, requireRole('admin'), async (req, res) => {
+    const { benefitId } = req.params;
+    const { name, description, amount, monthlyBudget, ageMin, ageMax, barangayId, requiredDocuments } = req.body;
+    const actor = req.authUser;
+    try {
+        const snap = await admin.database().ref('benefits/' + benefitId).once('value');
+        if (!snap.exists()) return res.status(404).json({ success: false, message: 'Benefit not found.' });
+        
+        const updates = {
+            updatedAt: Date.now(),
+            updatedBy: actor.uid,
+            updatedByName: actor.name || actor.email || ''
+        };
+        
+        if (name !== undefined) updates.name = String(name).slice(0, 100);
+        if (description !== undefined) updates.description = String(description || '').slice(0, 500);
+        if (amount !== undefined) updates.amount = Number(amount);
+        if (monthlyBudget !== undefined) updates.monthlyBudget = Number(monthlyBudget);
+        if (ageMin !== undefined) updates.ageMin = ageMin ? Number(ageMin) : null;
+        if (ageMax !== undefined) updates.ageMax = ageMax ? Number(ageMax) : null;
+        if (barangayId !== undefined) updates.barangayId = barangayId || null;
+        if (requiredDocuments !== undefined) updates.requiredDocuments = Array.isArray(requiredDocuments) ? requiredDocuments : [];
+        
+        await admin.database().ref('benefits/' + benefitId).update(updates);
+        await writeAuditLog('BENEFIT_UPDATED', actor, null, benefitId, 'Benefit updated');
+        
+        res.json({ success: true, message: 'Benefit updated successfully.' });
+    } catch (error) {
+        console.error('Benefit update error:', error);
+        res.status(500).json({ success: false, message: 'Failed to update benefit.' });
+    }
+});
+
+app.delete('/api/benefits/:benefitId', requireAuth, requireRole('admin'), async (req, res) => {
+    const { benefitId } = req.params;
+    const actor = req.authUser;
+    try {
+        const snap = await admin.database().ref('benefits/' + benefitId).once('value');
+        if (!snap.exists()) return res.status(404).json({ success: false, message: 'Benefit not found.' });
+        
+        await admin.database().ref('benefits/' + benefitId).remove();
+        await writeAuditLog('BENEFIT_DELETED', actor, null, benefitId, 'Benefit deleted');
+        
+        res.json({ success: true, message: 'Benefit deleted successfully.' });
+    } catch (error) {
+        console.error('Benefit deletion error:', error);
+        res.status(500).json({ success: false, message: 'Failed to delete benefit.' });
+    }
+});
+
+// --- API: Get document requirements for benefit ---
+app.get('/api/benefits/:benefitId/requirements', requireAuth, requireRole('admin', 'employee', 'senior'), async (req, res) => {
+    const { benefitId } = req.params;
+    const actor = req.authUser;
+    try {
+        const snap = await admin.database().ref('benefits/' + benefitId).once('value');
+        if (!snap.exists()) return res.status(404).json({ success: false, message: 'Benefit not found.' });
+        const benefit = snap.val();
+        
+        res.json({
+            success: true,
+            benefitId: benefitId,
+            benefitName: benefit.name || benefitId,
+            requiredDocuments: benefit.requiredDocuments || [],
+            ageMin: benefit.ageMin || null,
+            ageMax: benefit.ageMax || null,
+            barangayId: benefit.barangayId || null
+        });
+    } catch (error) {
+        console.error('Requirements error:', error);
+        res.status(500).json({ success: false, message: 'Failed to get requirements.' });
+    }
+});
+
+// ============================================================
+// ARCHIVE FUNCTION — Automatic Daily Backup & Data Recovery Plan
+// ------------------------------------------------------------
+// Every 24 hours the full Realtime Database is exported to the
+// local /backups folder as a restorable JSON snapshot. The most
+// recent 30 snapshots are kept (retention policy) and backup
+// metadata is mirrored to system/backups/lastBackup so the
+// Employee dashboard Archive tab can display recovery status.
+// ============================================================
+const BACKUP_DIR = path.join(__dirname, 'backups');
+const BACKUP_RETENTION_DAYS = 30;
+const BACKUP_FILENAME_PREFIX = 'silvercare-backup-';
+const ARCHIVED_RECORD_STATUSES = ['Inactive', 'Deceased', 'Transferred', 'Archived'];
+
+function listBackupFiles() {
+    if (!fs.existsSync(BACKUP_DIR)) return [];
+    return fs.readdirSync(BACKUP_DIR)
+        .filter(f => f.startsWith(BACKUP_FILENAME_PREFIX) && f.endsWith('.json'))
+        .sort(); // ascending — timestamp is embedded in the file name
+}
+
+async function runDatabaseBackup(trigger = 'automatic') {
+    if (!fs.existsSync(BACKUP_DIR)) fs.mkdirSync(BACKUP_DIR, { recursive: true });
+    const startedAt = Date.now();
+
+    // Full export of every node (single source of truth snapshot)
+    const snap = await admin.database().ref('/').once('value');
+    const data = snap.val() || {};
+    const users = data.users || {};
+    const seniorList = Object.values(users).filter(u => u && u.role === 'senior');
+    const archivedSeniors = seniorList.filter(u => ARCHIVED_RECORD_STATUSES.includes(String(u.lifeStatus || u.status || 'Active'))).length;
+    const counts = {
+        users: Object.keys(users).length,
+        seniors: seniorList.length,
+        activeSeniors: seniorList.length - archivedSeniors,
+        archivedSeniors: archivedSeniors,
+        claims: Object.keys(data.claims || {}).length,
+        transactions: Object.keys(data.transactions || {}).length
+    };
+
+    const stamp = new Date(startedAt).toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const fileName = `${BACKUP_FILENAME_PREFIX}${stamp}.json`;
+    const filePath = path.join(BACKUP_DIR, fileName);
+    const payload = JSON.stringify({
+        meta: {
+            createdAt: new Date(startedAt).toISOString(),
+            trigger: trigger,
+            retentionDays: BACKUP_RETENTION_DAYS,
+            counts: counts
+        },
+        data: data
+    });
+    fs.writeFileSync(filePath, payload, 'utf8');
+    const sizeBytes = Buffer.byteLength(payload, 'utf8');
+
+    // Retention policy — keep only the newest N snapshots
+    const files = listBackupFiles();
+    while (files.length > BACKUP_RETENTION_DAYS) {
+        const oldest = files.shift();
+        try { fs.unlinkSync(path.join(BACKUP_DIR, oldest)); } catch (e) { /* ignore */ }
+    }
+
+    // Mirror backup status into the database for dashboard display
+    await admin.database().ref('system/backups/lastBackup').set({
+        at: startedAt,
+        file: fileName,
+        trigger: trigger,
+        sizeBytes: sizeBytes,
+        counts: counts,
+        durationMs: Date.now() - startedAt
+    });
+
+    console.log(`[Backup] ${trigger} database backup created: ${fileName} (${(sizeBytes / 1024).toFixed(1)} KB)`);
+    return { file: fileName, sizeBytes, counts, at: startedAt, trigger };
+}
+
+// Runs a backup whenever the most recent snapshot is older than 24h.
+// Checked at boot and then every 30 minutes — this guarantees the
+// "automatic daily backup" even if the server restarts mid-day.
+function scheduleDailyBackups() {
+    const DAY_MS = 24 * 60 * 60 * 1000;
+    const check = async () => {
+        try {
+            const snap = await admin.database().ref('system/backups/lastBackup/at').once('value');
+            const last = snap.val() || 0;
+            if (Date.now() - last >= DAY_MS) {
+                const result = await runDatabaseBackup('automatic-daily');
+                await writeAuditLog('DATABASE_BACKUP_CREATED',
+                    { uid: 'system', role: 'system', name: 'Daily Backup Scheduler' },
+                    null, result.file,
+                    `Automatic daily backup created (${(result.sizeBytes / 1024).toFixed(1)} KB, ${result.counts.seniors} seniors)`);
+            }
+        } catch (e) {
+            console.error('[Backup] scheduled backup failed:', e.message);
+        }
+    };
+    setTimeout(check, 20000);           // shortly after boot
+    setInterval(check, 30 * 60 * 1000); // re-check every 30 minutes
+}
+scheduleDailyBackups();
+
+// --- API: Backup status for the Employee dashboard Archive tab ---
+app.get('/api/archive/backup-status', requireAuth, requireRole('admin', 'employee'), async (req, res) => {
+    try {
+        const snap = await admin.database().ref('system/backups/lastBackup').once('value');
+        const lastBackup = snap.val() || null;
+        const files = listBackupFiles();
+        const backups = files.slice(-10).reverse().map(f => {
+            let st = { size: 0, mtimeMs: 0 };
+            try { st = fs.statSync(path.join(BACKUP_DIR, f)); } catch (e) { /* ignore */ }
+            return { file: f, sizeBytes: st.size, createdAt: st.mtimeMs };
+        });
+        res.json({
+            success: true,
+            lastBackup: lastBackup,
+            fileCount: files.length,
+            retentionDays: BACKUP_RETENTION_DAYS,
+            backupIntervalHours: 24,
+            backups: backups,
+            nextRunInMs: lastBackup ? Math.max(0, (lastBackup.at || 0) + 24 * 60 * 60 * 1000 - Date.now()) : 0
+        });
+    } catch (error) {
+        console.error('Backup status error:', error);
+        res.status(500).json({ success: false, message: 'Failed to read backup status.' });
+    }
+});
+
+// --- API: Trigger an immediate (manual) backup ---
+app.post('/api/archive/backup-now', requireAuth, requireRole('admin', 'employee'), async (req, res) => {
+    const actor = req.authUser;
+    try {
+        const result = await runDatabaseBackup('manual: ' + (actor.name || actor.email || actor.uid));
+        await writeAuditLog('DATABASE_BACKUP_CREATED', actor, actor.uid, result.file,
+            `Manual backup created (${(result.sizeBytes / 1024).toFixed(1)} KB, ${result.counts.seniors} seniors)`);
+        res.json({ success: true, message: 'Backup created successfully.', backup: result });
+    } catch (error) {
+        console.error('Manual backup error:', error);
+        res.status(500).json({ success: false, message: 'Failed to create backup: ' + error.message });
+    }
+});
+
+// --- API: Download a backup snapshot (defaults to the most recent) ---
+app.get('/api/archive/backup/download', requireAuth, requireRole('admin', 'employee'), (req, res) => {
+    try {
+        const requested = String(req.query.file || '');
+        let fileName = requested;
+        if (!fileName) {
+            const files = listBackupFiles();
+            if (files.length === 0) return res.status(404).json({ success: false, message: 'No backup files exist yet. Run a backup first.' });
+            fileName = files[files.length - 1];
+        }
+        // Path-traversal guard — only plain backup file names are allowed
+        if (!fileName.startsWith(BACKUP_FILENAME_PREFIX) || !fileName.endsWith('.json') ||
+            fileName.includes('..') || fileName.includes('/') || fileName.includes('\\')) {
+            return res.status(400).json({ success: false, message: 'Invalid backup file name.' });
+        }
+        const filePath = path.join(BACKUP_DIR, fileName);
+        if (!fs.existsSync(filePath)) return res.status(404).json({ success: false, message: 'Backup file not found.' });
+        res.download(filePath, fileName);
+    } catch (error) {
+        console.error('Backup download error:', error);
+        res.status(500).json({ success: false, message: 'Failed to download backup.' });
+    }
+});
+
+// --- API: Full raw export of Firebase + Supabase (admin only) ---
+// Powers the "Download Full Backup (ZIP)" button in Admin -> Settings.
+// Uses the Admin SDK, which bypasses Realtime Database security rules —
+// the browser cannot read the root node directly, but the server can.
+app.get('/api/admin/backup/full-export', requireAuth, requireRole('admin'), async (req, res) => {
+    const actor = req.authUser;
+    try {
+        // 1) Entire Firebase Realtime Database (every top-level node)
+        const snap = await admin.database().ref('/').once('value');
+        const firebase = snap.val() || {};
+
+        // 2) Supabase mirror (seniors table rows + storage file inventory)
+        let supabase;
+        try {
+            supabase = await seniorStore.exportAllData();
+        } catch (err) {
+            console.error('Supabase export failed:', err.message);
+            supabase = { enabled: false, error: err.message };
+        }
+
+        await writeAuditLog('DATABASE_FULL_EXPORT', actor, actor.uid, null,
+            `Full backup export downloaded (firebase nodes: ${Object.keys(firebase).length}, supabase: ${supabase.enabled ? 'included' : 'unavailable'})`);
+
+        res.json({
+            success: true,
+            generatedAt: new Date().toISOString(),
+            firebase: firebase,
+            supabase: supabase
+        });
+    } catch (error) {
+        console.error('Full export error:', error);
+        res.status(500).json({ success: false, message: 'Failed to export database: ' + error.message });
+    }
+});
 
 app.listen(PORT, () => {
     console.log(`SilverCare Server running on http://localhost:${PORT}`);

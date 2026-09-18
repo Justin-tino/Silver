@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reactivate My Account — SilverCare</title>
+    <link rel="icon" type="image/png" href="images/logo.png">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0; font-family: 'Inter', Arial, sans-serif; color: #1e293b;
+            background: linear-gradient(135deg, #ecfdf5, #f0f9ff);
+            min-height: 100vh; display: flex; flex-direction: column; align-items: center;
+            padding: 24px 14px 60px;
+        }
+        .react-card {
+            width: 100%; max-width: 640px; background: #ffffff; border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.08); overflow: hidden; border: 1px solid #e2e8f0;
+        }
+        .react-header {
+            background: linear-gradient(135deg, #065f46, #059669); color: #fff;
+            padding: 30px 28px; text-align: center;
+        }
+        .react-header h1 { margin: 6px 0 4px; font-size: 1.6rem; }
+        .react-header p { margin: 0; opacity: 0.9; font-size: 1rem; }
+        .react-body { padding: 28px; }
+        .step-dots { display: flex; gap: 8px; justify-content: center; margin-bottom: 24px; }
+        .step-dots span { width: 12px; height: 12px; border-radius: 50%; background: #e2e8f0; }
+        .step-dots span.on { background: #059669; }
+        .step { display: none; }
+        .step.show { display: block; }
+        .step h2 { font-size: 1.25rem; margin: 0 0 8px; }
+        .step h2 i { color: #059669; margin-right: 8px; }
+        .step .hint { color: #64748b; font-size: 1rem; line-height: 1.55; margin: 0 0 18px; }
+        label { display: block; font-weight: 700; margin: 14px 0 6px; font-size: 1rem; }
+        input[type="text"] {
+            width: 100%; padding: 14px; font-size: 1.1rem; border: 2px solid #cbd5e1; border-radius: 10px;
+        }
+        input:focus { outline: none; border-color: #059669; }
+        .btn {
+            display: block; width: 100%; padding: 15px; margin-top: 18px; border: none; border-radius: 10px;
+            font-size: 1.1rem; font-weight: 700; cursor: pointer;
+        }
+        .btn-green { background: #059669; color: #fff; }
+        .btn-green:hover { background: #047857; }
+        .btn-green:disabled { background: #a7f3d0; cursor: not-allowed; }
+        .btn-ghost { background: #f1f5f9; color: #334155; }
+        .btn-ghost:hover { background: #e2e8f0; }
+        .msg { display: none; border-radius: 10px; padding: 13px 15px; margin-top: 16px; font-size: 1rem; line-height: 1.5; }
+        .msg.ok { display: block; background: #ecfdf5; border: 1px solid #6ee7b7; color: #065f46; }
+        .msg.err { display: block; background: #fef2f2; border: 1px solid #fca5a5; color: #991b1b; }
+        .msg.info { display: block; background: #eff6ff; border: 1px solid #93c5fd; color: #1e40af; }
+        #videoWrap { position: relative; margin-top: 14px; border-radius: 14px; overflow: hidden; background: #0f172a; }
+        #liveVideo { width: 100%; display: block; transform: scaleX(-1); }
+        #scanFrame { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
+        #scanFrame div { width: 62%; aspect-ratio: 3/4; max-height: 82%; border: 4px solid #34d399; border-radius: 18px; box-shadow: 0 0 0 999px rgba(15,23,42,0.45); }
+        #matchBar { height: 14px; background: #e2e8f0; border-radius: 8px; overflow: hidden; margin-top: 14px; }
+        #matchFill { height: 100%; width: 0; background: #059669; transition: width 0.4s; }
+        #matchText { margin-top: 8px; font-weight: 700; font-size: 1.05rem; color: #065f46; min-height: 1.6em; }
+        .back-link { margin-top: 22px; text-align: center; font-size: 1rem; }
+        .back-link a { color: #059669; font-weight: 700; text-decoration: none; }
+        .back-link a:hover { text-decoration: underline; }
+        .next-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px 18px; margin-top: 20px; font-size: 0.98rem; line-height: 1.6; color: #475569; }
+        .wait-visual { display: flex; align-items: center; gap: 16px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 14px; padding: 18px; margin-top: 6px; }
+        .wait-spinner { width: 46px; height: 46px; flex: 0 0 46px; border: 5px solid #bbf7d0; border-top-color: #059669; border-radius: 50%; animation: reactspin 1s linear infinite; }
+        @keyframes reactspin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div class="react-card">
+        <div class="react-header">
+            <img src="images/logo.png" alt="SilverCare" onerror="this.onerror=null; this.replaceWith(Object.assign(document.createElement('div'), {textContent:'🐱', style:'width:64px;height:64px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;font-size:2rem;margin:0 auto;'}))" style="width:64px; height:64px; border-radius:50%; object-fit:cover; border:3px solid rgba(255,255,255,0.6);">
+            <h1>Reactivate My Account</h1>
+            <p>OSCA Magalang · SilverCare Senior Portal</p>
+        </div>
+        <div class="react-body">
+            <div class="step-dots"><span id="dot1" class="on"></span><span id="dot2"></span><span id="dot3"></span></div>
+
+            <!-- STEP 1 — OSCA / Senior ID -->
+            <div class="step show" id="step1">
+                <h2><i class="fas fa-id-card"></i>Step 1 — Enter your OSCA ID</h2>
+                <p class="hint">Type the <strong>OSCA / Senior Citizen ID number</strong> from your registration. Your account will be found using this ID, then we will scan your face to confirm it is really you.</p>
+                <label for="reactSeniorId">OSCA / Senior Citizen ID number</label>
+                <input type="text" id="reactSeniorId" placeholder="e.g. OSCA-2024-0123" autocomplete="off">
+                <button class="btn btn-green" id="findAccountBtn"><i class="fas fa-magnifying-glass"></i> Continue to Face Scan</button>
+                <div class="msg" id="msg1"></div>
+                <div class="next-box">
+                    <strong>Where do I find my OSCA ID?</strong><br>
+                    It is the ID number given to you when you registered at the OSCA office — it is written on your Senior Citizen ID card and shown on your SilverCare profile.
+                    Lost it? Please visit the OSCA Magalang office for help.
+                </div>
+            </div>
+
+            <!-- STEP 2 — face scan -->
+            <div class="step" id="step2">
+                <h2><i class="fas fa-camera"></i>Step 2 — Scan your face</h2>
+                <p class="hint" id="faceHint">Allow camera access, look straight at the camera with good light, then press <strong>Start Camera</strong> and <strong>Scan My Face</strong>.</p>
+                <div id="videoWrap">
+                    <video id="liveVideo" autoplay playsinline muted></video>
+                    <div id="scanFrame"><div></div></div>
+                </div>
+                <button class="btn btn-green" id="startCamBtn"><i class="fas fa-video"></i> Start Camera</button>
+                <button class="btn btn-green" id="scanBtn" disabled><i class="fas fa-user-check"></i> Scan My Face</button>
+                <div id="matchBar"><div id="matchFill"></div></div>
+                <div id="matchText"></div>
+                <button class="btn btn-green" id="submitBtn" disabled style="background:#1e293b;">Send Reactivation Request</button>
+                <div class="msg" id="msg2"></div>
+                <div class="next-box">
+                    <strong>What happens next?</strong><br>
+                    Your face photo will be compared with the photo from your registration.
+                    If it matches, your scanned face and request are sent to <strong>OSCA staff for final approval</strong>.
+                    Once approved, you can log in again. You may also visit the OSCA office anytime for help.
+                </div>
+            </div>
+
+            <!-- STEP 3 — waiting for staff review -->
+            <div class="step" id="step3">
+                <div id="waitBox">
+                    <h2><i class="fas fa-hourglass-half"></i>Step 3 — Waiting for review</h2>
+                    <p class="hint">Your face scan was sent! OSCA staff will now review it and give the final approval. This page updates <strong>by itself</strong> — please keep it open.</p>
+                    <div class="wait-visual">
+                        <div class="wait-spinner"></div>
+                        <div>
+                            <div style="font-weight:800; color:#1e293b; font-size:1.05rem;">Request received</div>
+                            <div id="waitSince" style="color:#64748b; font-size:0.95rem; margin-top:4px;"></div>
+                            <div style="color:#64748b; font-size:0.95rem; margin-top:2px;">Checking for updates every 10 seconds…</div>
+                        </div>
+                    </div>
+                    <div class="next-box">
+                        <strong>While you wait:</strong><br>
+                        · Keep this page open — we will show the result here automatically.<br>
+                        · If approved, you can log in again right away.<br>
+                        · If not approved, please visit the OSCA office with a valid ID for help.<br>
+                        · You can also log in to check later — your account becomes active once approved.
+                    </div>
+                    <button class="btn btn-ghost" id="waitCheckBtn"><i class="fas fa-rotate"></i> Check Now</button>
+                </div>
+                <div id="approvedBox" style="display:none; text-align:center;">
+                    <div style="width:80px; height:80px; background:#dcfce7; color:#16a34a; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:2.2rem; margin:6px auto 16px;"><i class="fas fa-circle-check"></i></div>
+                    <h2 style="color:#16a34a;"><i class="fas fa-unlock"></i>Account Reactivated!</h2>
+                    <p class="hint">Good news! OSCA staff approved your face scan and your account is <strong>active again</strong>. You can now log in with your email and password.</p>
+                    <a class="btn btn-green" href="/" style="text-decoration:none; text-align:center; display:block;">Go to Login</a>
+                </div>
+                <div id="rejectedBox" style="display:none; text-align:center;">
+                    <div style="width:80px; height:80px; background:#fef2f2; color:#dc2626; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:2.2rem; margin:6px auto 16px;"><i class="fas fa-circle-xmark"></i></div>
+                    <h2 style="color:#b91c1c;"><i class="fas fa-circle-exclamation"></i>Request Not Approved</h2>
+                    <p class="hint" id="rejectedReason">OSCA staff could not approve your request. Please visit the OSCA Magalang office with a valid ID for assistance.</p>
+                    <a class="btn btn-green" href="/" style="text-decoration:none; text-align:center; display:block;">Back to Home</a>
+                </div>
+            </div>
+            <div class="back-link"><a href="/">← Back to Home / Login</a> &nbsp;·&nbsp; <a href="/user-manual">📖 User Manual</a></div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/face-api.js/0.22.2/face-api.min.js"></script>
+    <script src="js/reactivate.js"></script>
+</body>
+</html>

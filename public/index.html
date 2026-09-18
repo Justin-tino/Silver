@@ -57,18 +57,83 @@
                 <!-- Icon and Title injected by JS -->
             </div>
 
-            <form id="loginForm" class="login-form">
+            <form id="loginForm" class="login-form" autocomplete="off">
                 <div class="input-group">
                     <i class="fas fa-envelope"></i>
-                    <input type="email" id="email" placeholder="Email Address" required>
+                    <input type="email" id="email" name="user_login_email" placeholder="Email Address" autocomplete="off" required>
                 </div>
                 
                 <div class="input-group">
                     <i class="fas fa-lock"></i>
-                    <input type="password" id="password" placeholder="Password" required>
+                    <input type="password" id="password" name="user_login_password" placeholder="Password" autocomplete="new-password" required>
                 </div>
                 
+                <div style="text-align: right; margin: -8px 0 15px; display: none;" id="forgotPwWrapper">
+                    <a href="#" id="forgotPwLink" style="color: #3b82f6; font-size: 0.8rem; font-weight: 500; text-decoration: none;">Forgot Password?</a>
+                </div>
+
                 <button type="submit" class="btn btn-primary btn-block" style="background: #3b82f6;">Verify & Login</button>
+                <div id="reactivateWrapper" style="text-align: center; margin-top: 14px; display: none;">
+                    <a href="/reactivate" style="color: #059669; font-size: 0.85rem; font-weight: 600; text-decoration: none;">
+                        <i class="fas fa-face-smile"></i> Account inactive? Reactivate with Face Scan
+                    </a>
+                </div>
+            </form>
+        </div>
+
+        <!-- Two-Factor Authentication Screen (Admin & OSCA Staff only — hidden initially) -->
+        <div id="twoFAContainer" class="glass-container login-card" style="display: none; background: white; margin-top: 20px;">
+            <button id="otpBackBtn" type="button" style="background:none; border:none; color:#718096; cursor:pointer; margin-bottom:20px;">
+                <i class="fas fa-undo"></i> Back to role selection
+            </button>
+
+            <div style="text-align: center; margin-bottom: 25px;">
+                <i id="otpRoleIcon" class="fas fa-shield-alt" style="font-size: 3rem; color: #3b82f6; margin-bottom: 10px;"></i>
+                <h3 id="otpRoleTitle" style="margin-bottom: 5px;">Admin Login</h3>
+                <h4 style="margin: 0 0 8px; font-weight: 700;">Two-Factor Authentication</h4>
+                <p style="color: #718096; font-size: 0.85rem; margin: 0;">We've sent just you an email to
+                    <span id="otpSentEmail" style="font-weight: 600;">example@gmail.com</span>
+                </p>
+            </div>
+
+            <form id="otpForm" autocomplete="off">
+                <label style="display: block; font-size: 0.8rem; font-weight: 600; color: #1e293b; margin-bottom: 10px;">Email Address</label>
+                <div class="otp-group">
+                    <input type="text" class="otp-input" maxlength="1" inputmode="numeric" autocomplete="one-time-code" aria-label="Digit 1">
+                    <input type="text" class="otp-input" maxlength="1" inputmode="numeric" aria-label="Digit 2">
+                    <input type="text" class="otp-input" maxlength="1" inputmode="numeric" aria-label="Digit 3">
+                    <input type="text" class="otp-input" maxlength="1" inputmode="numeric" aria-label="Digit 4">
+                    <input type="text" class="otp-input" maxlength="1" inputmode="numeric" aria-label="Digit 5">
+                    <input type="text" class="otp-input" maxlength="1" inputmode="numeric" aria-label="Digit 6">
+                </div>
+
+                <button type="submit" id="verifyOtpBtn" class="btn btn-block" style="background: #3b82f6; color: white; width: 100%; margin-top: 25px; font-weight: 600;">Verify &amp; Login</button>
+            </form>
+
+            <p style="text-align: center; margin: 15px 0 0; font-size: 0.8rem; color: #718096;">
+                Didn't receive the code? <a href="#" id="resendOtpLink" style="color: #3b82f6; font-weight: 600; text-decoration: none;">Resend</a>
+            </p>
+        </div>
+
+        <!-- Forgot Password Screen (Admin accounts — hidden initially) -->
+        <div id="forgotPwContainer" class="glass-container login-card" style="display: none; background: white; margin-top: 20px;">
+            <button id="forgotPwBackBtn" type="button" style="background:none; border:none; color:#718096; cursor:pointer; margin-bottom:20px;">
+                <i class="fas fa-arrow-left"></i> Back to login
+            </button>
+
+            <div style="text-align: center; margin-bottom: 25px;">
+                <i class="fas fa-key" style="font-size: 3rem; color: #3b82f6; margin-bottom: 10px;"></i>
+                <h3 style="margin-bottom: 5px;">Admin Login</h3>
+                <h4 style="margin: 0 0 8px; font-weight: 700;">Forgot Password</h4>
+                <p style="color: #718096; font-size: 0.85rem; margin: 0;">Enter your admin email and we'll send you a secure link to reset your password.</p>
+            </div>
+
+            <form id="forgotPwForm" autocomplete="off">
+                <div class="input-group">
+                    <i class="fas fa-envelope"></i>
+                    <input type="email" id="forgotPwEmail" placeholder="Email Address" required>
+                </div>
+                <button type="submit" id="sendResetBtn" class="btn btn-primary btn-block" style="background: #3b82f6; width: 100%;">Send Reset Link</button>
             </form>
         </div>
     </div>
@@ -79,7 +144,15 @@
         function showLogin(role) {
             document.getElementById('roleSelection').style.display = 'none';
             document.getElementById('loginFormContainer').style.display = 'block';
-            
+
+            // Password reset link is only offered for the Admin role
+            const forgotWrapper = document.getElementById('forgotPwWrapper');
+            if (forgotWrapper) forgotWrapper.style.display = (role === 'admin') ? 'block' : 'none';
+
+            // Face-scan reactivation link is only offered for the Senior role
+            const reactivateWrapper = document.getElementById('reactivateWrapper');
+            if (reactivateWrapper) reactivateWrapper.style.display = (role === 'senior') ? 'block' : 'none';
+
             const header = document.getElementById('loginHeader');
             const emailInput = document.getElementById('email');
             const passInput = document.getElementById('password');
