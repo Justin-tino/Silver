@@ -48,6 +48,13 @@ app.get('/api/health', (req, res) => {
     res.json({ ok: true, service: 'silvercare', time: new Date().toISOString() });
 });
 
+// --- E-mail provider status (no auth, no secrets) ---
+// Open https://YOUR-APP.up.railway.app/api/email-status in a browser to
+// instantly see which e-mail provider is active and which keys are set.
+app.get('/api/email-status', (req, res) => {
+    res.json(emailStatusPayload());
+});
+
 // --- Disable caching for HTML responses to prevent BFCache security issues ---
 app.use((req, res, next) => {
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
@@ -146,7 +153,18 @@ function reactivationStartRateLimited(ip) {
     return rec.count > REACTIVATION_START_MAX;
 }
 
-// --- Nodemailer Transporter ---
+// --- E-mail delivery (SMTP locally, HTTPS API on Railway) ---
+// Railway blocks outbound SMTP (ports 25/465/587) on Free/Trial/Hobby
+// plans — Gmail via nodemailer will ALWAYS time out there, no matter how
+// correct EMAIL_USER/EMAIL_PASS are. The fix is an HTTPS email API
+// (Brevo or Resend), which uses port 443 and works on every Railway plan.
+// Priority: BREVO_API_KEY (recommended, free 300/day, Gmail sender OK) >
+// RESEND_API_KEY > Gmail SMTP fallback (local dev / Railway Pro only).
+const EMAIL_PROVIDER = process.env.BREVO_API_KEY ? 'brevo'
+    : (process.env.RESEND_API_KEY ? 'resend' : 'smtp');
+console.log(`E-mail provider: ${EMAIL_PROVIDER}`);
+
+// --- Nodemailer Transporter (SMTP fallback: local dev / Railway Pro) ---
 // Timeouts added so email hangs can never leave a frontend fetch pending
 // forever (e.g. stuck "Sending Code..." button).
 const transporter = nodemailer.createTransport({
@@ -160,12 +178,110 @@ const transporter = nodemailer.createTransport({
     socketTimeout: 20000      // 20s of inactivity = give up
 });
 
-// Verify the SMTP connection at startup (non-blocking) so a bad
-// EMAIL_USER/EMAIL_PASS shows up in Deploy Logs immediately instead of
-// surfacing later as a stuck "Sending Code..." button.
-transporter.verify()
-    .then(() => console.log('SMTP transporter verified — e-mails can be sent.'))
-    .catch(err => console.error('SMTP transporter verification FAILED (OTP/reset e-mails will fail):', err.message));
+// Verify the SMTP connection at startup ONLY when SMTP is the active
+// provider. On Railway free plans the verify would always fail (blocked
+// ports) and only add noise — the HTTPS API needs no verification.
+if (EMAIL_PROVIDER === 'smtp') {
+    transporter.verify()
+        .then(() => console.log('SMTP transporter verified — e-mails can be sent.'))
+        .catch(err => console.error('SMTP transporter verification FAILED (OTP/reset e-mails will fail):', err.message));
+} else {
+    console.log(`SMTP verification skipped (using ${EMAIL_PROVIDER} HTTPS API).`);
+}
+
+// Unified e-mail sender — every route MUST use this, never transporter directly.
+async function sendEmail({ to, subject, html }) {
+    const fromName = 'SilverCare OSCA (No-Reply)';
+    const fromAddr = process.env.EMAIL_USER || 'noreply@silvercare.com';
+
+    // --- Brevo HTTPS API (recommended for Railway free) ---
+    if (process.env.BREVO_API_KEY) {
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), 20000);
+        try {
+            const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
+                method: 'POST',
+                headers: {
+                    'accept': 'application/json',
+                    'content-type': 'application/json',
+                    'api-key': process.env.BREVO_API_KEY
+                },
+                body: JSON.stringify({
+                    sender: { name: fromName, email: process.env.BREVO_SENDER || fromAddr },
+                    to: [{ email: to }],
+                    replyTo: { email: 'noreply@silvercare.com' },
+                    subject,
+                    htmlContent: html
+                }),
+                signal: ctrl.signal
+            });
+            const data = await resp.json().catch(() => ({}));
+            if (!resp.ok) {
+                throw new Error(data.message || `Brevo API error (HTTP ${resp.status})`);
+            }
+            return data;
+        } catch (e) {
+            if (e && e.name === 'AbortError') throw new Error('Email provider timed out (20s). Please try again.');
+            throw e;
+        } finally {
+            clearTimeout(t);
+        }
+    }
+
+    // --- Resend HTTPS API (alternative) ---
+    if (process.env.RESEND_API_KEY) {
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), 20000);
+        try {
+            const resp = await fetch('https://api.resend.com/emails', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    from: process.env.RESEND_FROM || `${fromName} <onboarding@resend.dev>`,
+                    to: [to],
+                    subject,
+                    html
+                }),
+                signal: ctrl.signal
+            });
+            const data = await resp.json().catch(() => ({}));
+            if (!resp.ok) {
+                throw new Error(data.message || `Resend API error (HTTP ${resp.status})`);
+            }
+            return data;
+        } catch (e) {
+            if (e && e.name === 'AbortError') throw new Error('Email provider timed out (20s). Please try again.');
+            throw e;
+        } finally {
+            clearTimeout(t);
+        }
+    }
+
+    // --- Gmail SMTP fallback (local dev / Railway Pro with SMTP) ---
+    return transporter.sendMail({
+        from: `"${fromName}" <${fromAddr}>`,
+        replyTo: 'noreply@silvercare.com',
+        to,
+        subject,
+        html
+    });
+}
+
+// Public (unauthenticated) status endpoint — reports WHICH provider is
+// active and whether its key is present. No secrets are ever returned.
+// Open /api/email-status in a browser to instantly see why mail fails.
+function emailStatusPayload() {
+    return {
+        ok: true,
+        provider: EMAIL_PROVIDER,
+        brevoConfigured: Boolean(process.env.BREVO_API_KEY),
+        resendConfigured: Boolean(process.env.RESEND_API_KEY),
+        gmailConfigured: Boolean(process.env.EMAIL_USER && process.env.EMAIL_PASS)
+    };
+}
 
 // --- Security: Auth Middleware ---
 async function requireAuth(req, res, next) {
@@ -280,9 +396,8 @@ app.post('/api/send-otp', async (req, res) => {
     </div>`;
 
     try {
-        const sendPromise = transporter.sendMail({
-            from: `"SilverCare OSCA (No-Reply)" <${process.env.EMAIL_USER}>`,
-            replyTo: 'noreply@silvercare.com',
+        // sendEmail() picks Brevo/Resend HTTPS API on Railway, Gmail SMTP locally.
+        const sendPromise = sendEmail({
             to: email,
             subject: 'SilverCare - Your Verification Code',
             html: htmlEmail
@@ -471,9 +586,7 @@ app.post('/api/send-status-email', requireAuth, requireRole('admin', 'employee')
     </div>`;
 
     try {
-        await transporter.sendMail({
-            from: `"SilverCare OSCA (No-Reply)" <${process.env.EMAIL_USER}>`,
-            replyTo: 'noreply@silvercare.com',
+        await sendEmail({
             to: email,
             subject: `Official Notice: ${title}`,
             html: htmlEmail
@@ -544,9 +657,7 @@ app.post('/api/2fa/start', requireAuth, requireRole('admin', 'employee'), async 
             lastSentAt: Date.now()
         });
 
-        await transporter.sendMail({
-            from: `"SilverCare OSCA (No-Reply)" <${process.env.EMAIL_USER}>`,
-            replyTo: 'noreply@silvercare.com',
+        await sendEmail({
             to: actor.email,
             subject: 'SilverCare Staff Sign-In — Security Code',
             html: twoFAEmailTemplate(code)
@@ -943,9 +1054,7 @@ app.post('/api/forgot-password', async (req, res) => {
 
         const resetLink = `${getPublicBaseUrl(req)}/reset-password?token=${token}`;
 
-        await transporter.sendMail({
-            from: `"SilverCare OSCA (No-Reply)" <${process.env.EMAIL_USER}>`,
-            replyTo: 'noreply@silvercare.com',
+        await sendEmail({
             to: targetEmail,
             subject: 'SilverCare Admin — Password Reset Link',
             html: passwordResetEmailTemplate(resetLink)
@@ -990,9 +1099,7 @@ app.post('/api/reset-password', async (req, res) => {
         await writeAuditLog('PASSWORD_RESET_COMPLETED', { uid: entry.uid, role: 'admin', email: entry.email }, entry.uid, null, 'Password changed via e-mailed reset link');
 
         // Best-effort confirmation email (non-blocking)
-        transporter.sendMail({
-            from: `"SilverCare OSCA (No-Reply)" <${process.env.EMAIL_USER}>`,
-            replyTo: 'noreply@silvercare.com',
+        sendEmail({
             to: entry.email,
             subject: 'SilverCare Admin — Your Password Was Changed',
             html: `<div style="font-family:'Inter',Arial,sans-serif;max-width:500px;margin:0 auto;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">
@@ -1005,7 +1112,7 @@ app.post('/api/reset-password', async (req, res) => {
                     <p style="color: #94a3b8; font-size: 0.8rem;">${new Date().toLocaleString('en-PH', { timeZone: 'Asia/Manila' })} (Philippine Standard Time)</p>
                 </div>
             </div>`
-        }).catch(err => console.error('Password-changed email failed:', err.message));
+        }).catch(err => console.error('Password-changed email failed:', err && err.message ? err.message : err));
 
         res.json({ success: true, message: 'Your password has been updated. You can now log in with your new password.' });
     } catch (error) {
