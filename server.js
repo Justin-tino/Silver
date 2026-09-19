@@ -40,7 +40,13 @@ if (fs.existsSync('./database.rules.json')) {
 }
 
 const app = express();
+app.set('trust proxy', 1); // Railway terminates TLS at its proxy — needed for correct req.protocol/host
 const PORT = process.env.PORT || 3000;
+
+// --- Healthcheck endpoint for Railway (no auth) ---
+app.get('/api/health', (req, res) => {
+    res.json({ ok: true, service: 'silvercare', time: new Date().toISOString() });
+});
 
 // --- Disable caching for HTML responses to prevent BFCache security issues ---
 app.use((req, res, next) => {
@@ -51,14 +57,34 @@ app.use((req, res, next) => {
     next();
 });
 
-// --- CORS: Restrict to same origin ---
+// --- CORS: same-origin app + configured deployment domains ---
+// Railway automatically injects RAILWAY_PUBLIC_DOMAIN for the service.
+// PUBLIC_BASE_URL / ALLOWED_ORIGINS (comma-separated) cover custom domains.
+// NOTE: localhost entries are ONLY added outside production so no deployed
+// feature can ever depend on or leak a localhost origin.
+const allowedOrigins = new Set();
+if (process.env.NODE_ENV !== 'production') {
+    allowedOrigins.add(`http://localhost:${PORT}`);
+    allowedOrigins.add(`http://127.0.0.1:${PORT}`);
+}
+if (process.env.PUBLIC_BASE_URL) {
+    allowedOrigins.add(String(process.env.PUBLIC_BASE_URL).trim().replace(/\/+$/, ''));
+}
+if (process.env.RAILWAY_PUBLIC_DOMAIN) {
+    allowedOrigins.add(`https://${String(process.env.RAILWAY_PUBLIC_DOMAIN).trim()}`);
+}
+if (process.env.ALLOWED_ORIGINS) {
+    String(process.env.ALLOWED_ORIGINS).split(',').forEach(o => {
+        const v = o.trim().replace(/\/+$/, '');
+        if (v) allowedOrigins.add(v);
+    });
+}
 app.use(cors({
     origin: function (origin, callback) {
         // Allow requests with no origin (same-origin, Postman, server-to-server)
         if (!origin) return callback(null, true);
-        const allowed = [`http://localhost:${PORT}`, `http://127.0.0.1:${PORT}`];
-        if (allowed.includes(origin)) return callback(null, true);
-        callback(new Error('Not allowed by CORS'));
+        if (allowedOrigins.has(origin)) return callback(null, true);
+        callback(new Error('Not allowed by CORS: ' + origin));
     }
 }));
 app.use(express.json({ limit: '10mb' }));
@@ -560,7 +586,17 @@ app.post('/api/2fa/verify', requireAuth, requireRole('admin', 'employee'), (req,
 // A single-use, 15-minute reset token is e-mailed to the
 // admin's registered address. The link opens /reset-password
 // where a new password is set through the Firebase Admin SDK.
+// The link base prefers PUBLIC_BASE_URL (your Railway public URL);
+// otherwise it uses the request host (works behind Railway's proxy
+// thanks to `trust proxy`). No localhost is ever used in production.
 // ============================================================
+// Canonical public base URL of this deployment (no trailing slash).
+// Set PUBLIC_BASE_URL on Railway to https://<your-app>.up.railway.app
+function getPublicBaseUrl(req) {
+    const configured = String(process.env.PUBLIC_BASE_URL || '').trim().replace(/\/+$/, '');
+    if (configured) return configured;
+    return `${req.protocol}://${req.get('host')}`;
+}
 const passwordResetStore = new Map();  // token -> { uid, email, expiresAt }
 const resetRequestStore = new Map();   // email -> lastSentAt (request rate limit)
 const RESET_TOKEN_TTL_MS = 15 * 60 * 1000;
@@ -883,8 +919,7 @@ app.post('/api/forgot-password', async (req, res) => {
         passwordResetStore.set(token, { uid: targetUid, email: targetEmail, expiresAt: Date.now() + RESET_TOKEN_TTL_MS });
         resetRequestStore.set(normEmail, Date.now());
 
-        const base = `${req.protocol}://${req.get('host')}`;
-        const resetLink = `${base}/reset-password?token=${token}`;
+        const resetLink = `${getPublicBaseUrl(req)}/reset-password?token=${token}`;
 
         await transporter.sendMail({
             from: `"SilverCare OSCA (No-Reply)" <${process.env.EMAIL_USER}>`,
@@ -3854,16 +3889,22 @@ app.get('/api/benefits/:benefitId/requirements', requireAuth, requireRole('admin
 // ============================================================
 // ARCHIVE FUNCTION — Automatic Daily Backup & Data Recovery Plan
 // ------------------------------------------------------------
-// Every 24 hours the full Realtime Database is exported to the
-// local /backups folder as a restorable JSON snapshot. The most
-// recent 30 snapshots are kept (retention policy) and backup
-// metadata is mirrored to system/backups/lastBackup so the
-// Employee dashboard Archive tab can display recovery status.
+// Every 24 hours the full Realtime Database is exported.
+// ON RAILWAY (or any host with an ephemeral filesystem) the snapshot is
+// stored durably in Firebase itself at system/backups/snapshots/<fileName>
+// and mirrored to system/backups/lastBackup so the Employee dashboard
+// Archive tab can display recovery status. Locally (persistent disk) the
+// snapshot is ALSO written to the local /backups folder (kept: newest 30)
+// and can be downloaded from disk.
 // ============================================================
 const BACKUP_DIR = path.join(__dirname, 'backups');
 const BACKUP_RETENTION_DAYS = 30;
 const BACKUP_FILENAME_PREFIX = 'silvercare-backup-';
 const ARCHIVED_RECORD_STATUSES = ['Inactive', 'Deceased', 'Transferred', 'Archived'];
+// Railway (and most container hosts) have an ephemeral filesystem: files
+// written to disk vanish on redeploy/restart. Railway injects
+// RAILWAY_ENVIRONMENT, so use that to detect it.
+const IS_EPHEMERAL_FS = Boolean(process.env.RAILWAY_ENVIRONMENT || process.env.RAILWAY_PUBLIC_DOMAIN);
 
 function listBackupFiles() {
     if (!fs.existsSync(BACKUP_DIR)) return [];
@@ -3873,7 +3914,6 @@ function listBackupFiles() {
 }
 
 async function runDatabaseBackup(trigger = 'automatic') {
-    if (!fs.existsSync(BACKUP_DIR)) fs.mkdirSync(BACKUP_DIR, { recursive: true });
     const startedAt = Date.now();
 
     // Full export of every node (single source of truth snapshot)
@@ -3893,7 +3933,6 @@ async function runDatabaseBackup(trigger = 'automatic') {
 
     const stamp = new Date(startedAt).toISOString().replace(/[:.]/g, '-').slice(0, 19);
     const fileName = `${BACKUP_FILENAME_PREFIX}${stamp}.json`;
-    const filePath = path.join(BACKUP_DIR, fileName);
     const payload = JSON.stringify({
         meta: {
             createdAt: new Date(startedAt).toISOString(),
@@ -3903,14 +3942,37 @@ async function runDatabaseBackup(trigger = 'automatic') {
         },
         data: data
     });
-    fs.writeFileSync(filePath, payload, 'utf8');
     const sizeBytes = Buffer.byteLength(payload, 'utf8');
 
-    // Retention policy — keep only the newest N snapshots
-    const files = listBackupFiles();
-    while (files.length > BACKUP_RETENTION_DAYS) {
-        const oldest = files.shift();
-        try { fs.unlinkSync(path.join(BACKUP_DIR, oldest)); } catch (e) { /* ignore */ }
+    // 1) Durable copy: store the snapshot IN Firebase itself so it survives
+    //    Railway redeploys/restarts. Chunked into ~500 KB pieces to stay
+    //    safely under RTDB per-write limits.
+    const chunks = [];
+    for (let i = 0; i < payload.length; i += 500000) chunks.push(payload.slice(i, i + 500000));
+    const snapshotRef = admin.database().ref(`system/backups/snapshots/${fileName.replace(/\.json$/, '')}`);
+    await snapshotRef.set({
+        file: fileName,
+        createdAt: startedAt,
+        trigger: trigger,
+        sizeBytes: sizeBytes,
+        chunkCount: chunks.length,
+        counts: counts
+    });
+    for (let i = 0; i < chunks.length; i++) {
+        await snapshotRef.child(`chunks/${i}`).set(chunks[i]);
+    }
+
+    // 2) Local disk copy (persistent locally; best-effort on ephemeral hosts)
+    if (!IS_EPHEMERAL_FS) {
+        if (!fs.existsSync(BACKUP_DIR)) fs.mkdirSync(BACKUP_DIR, { recursive: true });
+        fs.writeFileSync(path.join(BACKUP_DIR, fileName), payload, 'utf8');
+
+        // Retention policy — keep only the newest N snapshots
+        const files = listBackupFiles();
+        while (files.length > BACKUP_RETENTION_DAYS) {
+            const oldest = files.shift();
+            try { fs.unlinkSync(path.join(BACKUP_DIR, oldest)); } catch (e) { /* ignore */ }
+        }
     }
 
     // Mirror backup status into the database for dashboard display
@@ -4051,7 +4113,39 @@ app.get('/api/admin/backup/full-export', requireAuth, requireRole('admin'), asyn
     }
 });
 
+// Warn when the QR signing secret is left on the insecure default
+if (!process.env.QR_SECRET) {
+    console.warn('WARNING: QR_SECRET is not set - QR verification codes fall back to an insecure default. Set QR_SECRET in your deployment environment.');
+}
+
+// Fail-fast check for required production env vars.
+// Locally these come from .env / serviceAccountKey.json; on Railway they
+// MUST be set as service Variables or the deploy will crash-loop otherwise.
+{
+    const missing = [];
+    if (!process.env.SERVICE_ACCOUNT_JSON && !fs.existsSync('./serviceAccountKey.json')) missing.push('SERVICE_ACCOUNT_JSON');
+    if (!process.env.EMAIL_USER) missing.push('EMAIL_USER');
+    if (!process.env.EMAIL_PASS) missing.push('EMAIL_PASS');
+    if (!process.env.FIREBASE_API_KEY) missing.push('FIREBASE_API_KEY');
+    if (!process.env.FIREBASE_AUTH_DOMAIN) missing.push('FIREBASE_AUTH_DOMAIN');
+    if (!process.env.FIREBASE_PROJECT_ID) missing.push('FIREBASE_PROJECT_ID');
+    if (!process.env.FIREBASE_STORAGE_BUCKET) missing.push('FIREBASE_STORAGE_BUCKET');
+    if (!process.env.FIREBASE_MESSAGING_SENDER_ID) missing.push('FIREBASE_MESSAGING_SENDER_ID');
+    if (!process.env.FIREBASE_APP_ID) missing.push('FIREBASE_APP_ID');
+    if (!process.env.FIREBASE_DATABASE_URL) missing.push('FIREBASE_DATABASE_URL'); // REQUIRED: RTDB is in asia-southeast1 — the default-region fallback URL would be wrong
+    if (!process.env.SUPABASE_URL) missing.push('SUPABASE_URL');
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) missing.push('SUPABASE_SERVICE_ROLE_KEY');
+    if (missing.length) {
+        console.error('Missing required environment variables: ' + missing.join(', '));
+        if (process.env.RAILWAY_ENVIRONMENT || process.env.RAILWAY_PUBLIC_DOMAIN) process.exit(1);
+        else console.warn('Continuing locally — set these in .env (see .env.example).');
+    }
+}
+
 app.listen(PORT, () => {
-    console.log(`SilverCare Server running on http://localhost:${PORT}`);
+    console.log(`SilverCare Server running on port ${PORT}`);
+    if (process.env.RAILWAY_PUBLIC_DOMAIN) {
+        console.log(`Public URL: https://${process.env.RAILWAY_PUBLIC_DOMAIN}`);
+    }
 });
 
