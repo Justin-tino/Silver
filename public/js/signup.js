@@ -84,11 +84,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
             try {
                 // Check if email already has a pending registration — if so, reset it
-                const resetRes = await fetch('/api/reset-pending-email', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email })
-                });
+                // (30s client timeout so a hung request restores the button + shows an error)
+                const resetController = new AbortController();
+                const resetTimer = setTimeout(() => resetController.abort(), 30000);
+                let resetRes;
+                try {
+                    resetRes = await fetch('/api/reset-pending-email', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email }),
+                        signal: resetController.signal
+                    });
+                } finally {
+                    clearTimeout(resetTimer);
+                }
                 const resetData = await resetRes.json();
                 if (!resetData.success) {
                     showError(resetData.message);
@@ -98,11 +107,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 // Call backend to send real OTP email
-                const response = await fetch('/api/send-otp', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email: email })
-                });
+                // (60s client timeout — server fails at 25s, but never hang forever)
+                const otpController = new AbortController();
+                const otpTimer = setTimeout(() => otpController.abort(), 60000);
+                let response;
+                try {
+                    response = await fetch('/api/send-otp', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email: email }),
+                        signal: otpController.signal
+                    });
+                } finally {
+                    clearTimeout(otpTimer);
+                }
 
                 const data = await response.json();
 
@@ -123,7 +141,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     showError(data.message || 'Failed to send verification code.');
                 }
             } catch (error) {
-                showError('Could not send verification code. Please check your connection and try again.');
+                console.error('OTP error:', error);
+                // AbortError = our client-side timeout fired (request hung)
+                showError((error && error.name === 'AbortError') ? 'The request timed out. Please check your connection and try again.' : 'Could not send verification code. Please check your connection and try again.');
             } finally {
                 btn.innerHTML = originalText;
                 btn.disabled = false;

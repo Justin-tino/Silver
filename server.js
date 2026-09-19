@@ -147,13 +147,25 @@ function reactivationStartRateLimited(ip) {
 }
 
 // --- Nodemailer Transporter ---
+// Timeouts added so email hangs can never leave a frontend fetch pending
+// forever (e.g. stuck "Sending Code..." button).
 const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS
-    }
+    },
+    connectionTimeout: 15000, // 15s to establish the SMTP connection
+    greetingTimeout: 10000,   // 10s for the SMTP greeting
+    socketTimeout: 20000      // 20s of inactivity = give up
 });
+
+// Verify the SMTP connection at startup (non-blocking) so a bad
+// EMAIL_USER/EMAIL_PASS shows up in Deploy Logs immediately instead of
+// surfacing later as a stuck "Sending Code..." button.
+transporter.verify()
+    .then(() => console.log('SMTP transporter verified — e-mails can be sent.'))
+    .catch(err => console.error('SMTP transporter verification FAILED (OTP/reset e-mails will fail):', err.message));
 
 // --- Security: Auth Middleware ---
 async function requireAuth(req, res, next) {
@@ -231,6 +243,9 @@ app.post('/api/reset-pending-email', async (req, res) => {
 });
 
 // --- API: Send OTP ---
+// NOTE: the e-mail send is wrapped in a 25s timeout race so a hung SMTP
+// connection can NEVER leave the frontend stuck on "Sending Code..." with
+// no error. On timeout the request fails cleanly and the button restores.
 app.post('/api/send-otp', async (req, res) => {
     const { email } = req.body;
     if (!email) return res.status(400).json({ success: false, message: 'Email is required.' });
@@ -265,21 +280,28 @@ app.post('/api/send-otp', async (req, res) => {
     </div>`;
 
     try {
-        await transporter.sendMail({
+        const sendPromise = transporter.sendMail({
             from: `"SilverCare OSCA (No-Reply)" <${process.env.EMAIL_USER}>`,
             replyTo: 'noreply@silvercare.com',
             to: email,
             subject: 'SilverCare - Your Verification Code',
             html: htmlEmail
         });
+        // 25s ceiling — if Gmail never answers, fail cleanly instead of
+        // leaving the browser's fetch pending until it gives up on its own.
+        const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Email provider timed out (25s). Please try again.')), 25000)
+        );
+        await Promise.race([sendPromise, timeoutPromise]);
 
         console.log(`OTP sent to ${email}`);
         res.json({ success: true, message: 'Verification code sent.' });
     } catch (error) {
         console.error('Email send error:', error);
-        res.status(500).json({ success: false, message: 'Failed to send email. Check server email config.' });
+        const isTimeout = /timed out/i.test(error.message || '');
+        res.status(isTimeout ? 504 : 500).json({ success: false, message: isTimeout ? 'Email provider timed out. Please try again.' : 'Failed to send email. Check server email config.' });
     }
-});
+}); // end /api/send-otp
 
 // --- API: Verify OTP ---
 app.post('/api/verify-otp', (req, res) => {
