@@ -2983,15 +2983,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const verifyPill = document.getElementById('navPillVerification');
         if (!statusContainer) return;
 
-        // Auto-fill previously submitted age / health / sex / civil status if available (for profile auto-sync)
-        const kycAgeEl = document.getElementById('kycAgeInput');
+        // Auto-fill previously submitted health / sex / civil status if available (for profile auto-sync)
+        // NOTE: age is NEVER restored into a field — Step 1 has no age input;
+        // it is always computed live from the birthdate (kycDob) below.
         const kycHealthEl = document.getElementById('kycHealthCondition');
         const kycSexEl = document.getElementById('kycSex');
         const kycCivilEl = document.getElementById('kycCivilStatus');
-
-        if (kycAgeEl && userData.age !== undefined && userData.age !== null && userData.age !== '') {
-            kycAgeEl.value = userData.age;
-        }
 
         if (kycHealthEl && (userData.healthCondition || userData.condition)) {
             kycHealthEl.value = userData.healthCondition || userData.condition || 'None';
@@ -3061,6 +3058,24 @@ document.addEventListener('DOMContentLoaded', () => {
         if (age >= 90 && age <= 99) return 'Nonagenarian';
         if (age >= 100) return 'Centenarian';
         return null;
+    }
+
+    // Computes the senior's exact age from a birthdate value (YYYY-MM-DD),
+    // based on the current date. Returns null when the value is missing or
+    // invalid — never 0 for a real person, so a "0 age" can never be saved.
+    function computeAgeFromDobValue(dobValue) {
+        if (!dobValue) return null;
+        const birthDate = new Date(dobValue);
+        if (isNaN(birthDate.getTime())) return null;
+        // A birthdate in the future is invalid — treat it as missing.
+        const today = new Date();
+        if (birthDate > today) return null;
+        let age = today.getFullYear() - birthDate.getFullYear();
+        const m = today.getMonth() - birthDate.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+            age--;
+        }
+        return age >= 0 ? age : null;
     }
 
     // Resolves the senior's age from the stored account: prefers the saved
@@ -3721,8 +3736,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const dob = document.getElementById('kycDob').value;
             const kycSexVal = document.getElementById('kycSex')?.value || '';
             const kycCivilVal = document.getElementById('kycCivilStatus')?.value || '';
-            const kycAgeField = document.getElementById('kycAgeInput');
-            const ageVal = kycAgeField ? parseInt(kycAgeField.value, 10) : NaN;
+            // Age is NEVER typed — it is computed from the birthdate above.
+            const ageVal = computeAgeFromDobValue(dob);
 
             if (!firstName) { showToast('⚠️ Please enter your first name.'); document.getElementById('kycFirstName').focus(); return; }
             if (!lastName) { showToast('⚠️ Please enter your last name.'); document.getElementById('kycLastName').focus(); return; }
@@ -3739,10 +3754,16 @@ document.addEventListener('DOMContentLoaded', () => {
             // Personal-info validation ends here — Step 4 (Senior ID) owns the
             // back-to-back ID check, so seniors are not blocked at Step 1.
 
-            // Age is required for verification
-            if (isNaN(ageVal) || ageVal <= 0) {
-                showToast('⚠️ Please enter your age.');
-                if (kycAgeField) kycAgeField.focus();
+            // Age is auto-computed from the birthdate above — it is never typed,
+            // so a "0 age" is impossible. Under 50 = not eligible as a senior.
+            if (ageVal === null || ageVal === undefined || isNaN(ageVal)) {
+                showToast('⚠️ Please enter a valid Date of Birth so your age can be computed.');
+                document.getElementById('kycDob').focus();
+                return;
+            }
+            if (ageVal < 50) {
+                showToast("You're not eligible. You must be a senior.");
+                document.getElementById('kycDob').focus();
                 return;
             }
 
@@ -3757,6 +3778,37 @@ document.addEventListener('DOMContentLoaded', () => {
             // Under 80: no Benefit Program form needed — go straight to Face Scan
             goToKycStep(2);
         });
+    }
+
+    // Live age readout under the birthdate field: the senior only picks a
+    // birthdate; the system shows the auto-computed age (and the
+    // under-50 ineligibility notice) immediately while typing.
+    const kycDobEl = document.getElementById('kycDob');
+    if (kycDobEl && !kycDobEl.dataset.ageReadoutWired) {
+        kycDobEl.dataset.ageReadoutWired = '1';
+        const paintKycAgeReadout = () => {
+            const readout = document.getElementById('kycAgeReadout');
+            if (!readout) return;
+            const liveAge = computeAgeFromDobValue(kycDobEl.value);
+            readout.classList.remove('ok', 'bad');
+            if (liveAge === null || liveAge === undefined || isNaN(liveAge)) {
+                readout.textContent = kycDobEl.value
+                    ? '⚠️ Invalid birthdate — please pick a valid date.'
+                    : '';
+                if (kycDobEl.value) readout.classList.add('bad');
+                return;
+            }
+            if (liveAge < 50) {
+                readout.textContent = `Computed age: ${liveAge} — You're not eligible. You must be a senior.`;
+                readout.classList.add('bad');
+                return;
+            }
+            readout.classList.add('ok');
+            readout.textContent = `Computed age: ${liveAge} years old ✓`;
+        };
+        kycDobEl.addEventListener('input', paintKycAgeReadout);
+        kycDobEl.addEventListener('change', paintKycAgeReadout);
+        paintKycAgeReadout();
     }
 
     // Benefit interstitial Next — validates Annex A (Senior ID number now lives
@@ -4318,20 +4370,20 @@ document.addEventListener('DOMContentLoaded', () => {
         if (msSexEl && msSexEl.value) kycSex = msSexEl.value;
         if (msCivilEl && msCivilEl.value) kycCivilStatus = msCivilEl.value;
 
-        // Age is asked (required) during verification
-        const kycAgeField = document.getElementById('kycAgeInput');
-        let age = kycAgeField ? parseInt(kycAgeField.value, 10) : 0;
-        if (isNaN(age) || age <= 0) {
-            // Fallback: derive the age from the Date of Birth when not provided
-            if (dob) {
-                const birthDate = new Date(dob);
-                const today = new Date();
-                age = today.getFullYear() - birthDate.getFullYear();
-                const m = today.getMonth() - birthDate.getMonth();
-                if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-                    age--;
-                }
-            }
+        // Age is auto-computed from the birthdate — never typed, so a "0 age"
+        // is impossible. Defense-in-depth: recompute it here too and enforce
+        // the same 50+ eligibility rule as Step 1.
+        // NOTE: this runs BEFORE the submit button is disabled, so no reset needed.
+        let age = computeAgeFromDobValue(dob);
+        if (age === null || age === undefined || isNaN(age)) {
+            showToast('⚠️ Please enter a valid Date of Birth so your age can be computed.');
+            goToKycStep(1);
+            return;
+        }
+        if (age < 50) {
+            showToast("You're not eligible. You must be a senior.");
+            goToKycStep(1);
+            return;
         }
 
         // Determine priority level — OSCA milestone rule (80-89 Low, 90-99 Medium, 100+ High)

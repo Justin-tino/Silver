@@ -1711,6 +1711,10 @@
         #kycMedCertRemove { border: none; background: #fee2e2; color: #dc2626; font-size: 0.75rem; font-weight: 700; cursor: pointer; padding: 8px 12px; border-radius: 8px; flex-shrink: 0; }
         .kyc-submit-btn { background: linear-gradient(135deg, #16a34a, #15803d); box-shadow: 0 8px 20px rgba(34,197,94,0.35); }
         .kyc-submit-hint { text-align: center; font-size: 0.76rem; color: #64748b; margin: 10px 2px 0; line-height: 1.5; }
+        /* Auto-computed age readout under the birthdate field (no manual typing). */
+        .kyc-age-readout { margin-top: 8px; font-size: 0.82rem; font-weight: 700; color: #334155; line-height: 1.5; min-height: 1.2em; }
+        .kyc-age-readout.ok { color: #15803d; }
+        .kyc-age-readout.bad { color: #b91c1c; }
         .kyc-review-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px 16px; margin: 14px 0; font-size: 0.84rem; color: #334155; line-height: 1.6; }
         .kyc-review-box strong { color: #0f172a; }
         .kyc-review-box .ok { color: #15803d; font-weight: 700; }
@@ -2811,11 +2815,8 @@
                                     <div class="kyc-field">
                                         <label class="kyc-label">Date of Birth <span class="kyc-required">*</span></label>
                                         <input type="date" id="kycDob" class="kyc-input" required>
-                                    </div>
-
-                                    <div class="kyc-field">
-                                        <label class="kyc-label">Age <span class="kyc-required">*</span></label>
-                                        <input type="number" id="kycAgeInput" class="kyc-input" placeholder="e.g. 82" min="1" max="130" required>
+                                        <div id="kycAgeReadout" class="kyc-age-readout" aria-live="polite"></div>
+                                        <p class="kyc-id-hint" style="margin-top:6px;">No need to type your age — the system computes it automatically from this birthdate (must be 50+ to continue).</p>
                                     </div>
 
                                     <div class="kyc-field">

@@ -482,10 +482,9 @@ window.useReminderTemplate = function(i) {
 })();
 
 // ── Update Health Records notification indicator badge ──────────────────────
-// Red dot = pending senior appointment requests (checkups awaiting approval)
-// plus uploaded medical certifications still awaiting staff review.
-// Also drives the Health Records overview stat cards and the sub-tab pill
-// count badges, so every data update keeps the whole tab in sync.
+// Red dot = pending senior appointment requests (checkups awaiting approval).
+// Also drives the Health Records overview stat cards, so every data update
+// keeps the whole tab in sync.
 function updateHealthTabBadge() {
     const empHealthBadge = document.getElementById('empHealthBadge');
     const users = window.lastUsersData || {};
@@ -497,70 +496,43 @@ function updateHealthTabBadge() {
     const pendingApptCount = appts.filter(q => ['Pending', 'Rescheduled'].includes(q.status)).length;
     const approvedApptCount = appts.filter(q => q.status === 'Approved').length;
 
-    // Pending health updates / medical certifications submitted by verified seniors
-    let pendingCertCount = 0;
-    if (typeof collectHealthSubmissions === 'function') {
-        pendingCertCount = collectHealthSubmissions()
-            .filter(r => r.kycVerified && r.status === 'Pending Review').length;
-    }
-
-    // Verified, non-archived seniors currently marked High Priority by staff
-    let highPrioCount = 0;
-    Object.values(users).forEach(u => {
-        if (isListed(u) && (u.kycStatus === 'Verified' || !!u.kycVerifiedAt) &&
-            effectiveSeniorPriority(u) === 'High') highPrioCount++;
-    });
-
     if (empHealthBadge) {
         // Only show red dot badge if Health tab is not currently active
         const isHealthTabActive = document.getElementById('tab-health')?.style.display === 'block';
-        empHealthBadge.style.display = ((pendingApptCount + pendingCertCount) > 0 && !isHealthTabActive) ? 'block' : 'none';
+        empHealthBadge.style.display = (pendingApptCount > 0 && !isHealthTabActive) ? 'block' : 'none';
     }
 
-    // ── Health Records overview cards + sub-tab pill badges ──────────────────
+    // ── Health Records overview cards ──────────────────────────────────────
     const setText = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
     setText('healthStatPendingAppt', pendingApptCount);
     setText('healthStatUpcomingAppt', approvedApptCount);
-    setText('healthStatPendingCert', pendingCertCount);
-    setText('healthStatHighPrio', highPrioCount);
 
     const pillAppt = document.getElementById('healthSubTabCountAppointments');
     if (pillAppt) {
         pillAppt.textContent = pendingApptCount;
         pillAppt.style.display = pendingApptCount > 0 ? 'inline-block' : 'none';
     }
-    const pillCert = document.getElementById('healthSubTabCountPriority');
-    if (pillCert) {
-        pillCert.textContent = pendingCertCount;
-        pillCert.style.display = pendingCertCount > 0 ? 'inline-block' : 'none';
-    }
 }
 
-// ── Health Records sub-tab switching (manageable redesign) ───────────────────
-// Switches between the "Appointment Requests" and "Illness & Priority"
-// workflows so staff work on one thing at a time instead of one long page.
+// The Illness & Priority sub-tab was removed — the Health Records tab is now
+// appointment requests only. These shims stay so the remaining overview cards
+// (and any cached page) keep working without JS errors.
+
+// ── Health Records sub-tab switching ───────────────────────────────────────
+// The Illness & Priority workflow was removed; the Health Records tab now
+// shows only the Appointment Requests list. This shim keeps the overview
+// cards (and any cached page) working without JS errors.
 window.switchHealthSubTab = function (section) {
     const apptWrap = document.getElementById('healthSubAppointments');
-    const prioWrap = document.getElementById('healthSubPriority');
+    if (apptWrap) apptWrap.style.display = 'block';
     const apptBtn = document.getElementById('healthSubTabBtnAppointments');
-    const prioBtn = document.getElementById('healthSubTabBtnPriority');
-    const showAppointments = section !== 'priority';
-
-    if (apptWrap) apptWrap.style.display = showAppointments ? 'block' : 'none';
-    if (prioWrap) prioWrap.style.display = showAppointments ? 'none' : 'block';
-
-    const onStyle = 'border: none; background: #1e293b; color: #ffffff; font-weight: 700; font-size: 0.85rem; padding: 9px 18px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 8px;';
-    const offStyle = 'border: none; background: transparent; color: #475569; font-weight: 700; font-size: 0.85rem; padding: 9px 18px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 8px;';
-    if (apptBtn) apptBtn.style.cssText = showAppointments ? onStyle : offStyle;
-    if (prioBtn) prioBtn.style.cssText = showAppointments ? offStyle : onStyle;
+    if (apptBtn) apptBtn.style.cssText = 'border: none; background: #1e293b; color: #ffffff; font-weight: 700; font-size: 0.85rem; padding: 9px 18px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 8px;';
 };
 
-// Jumps to the Illness & Priority sub-tab with a specific filter chip applied
-// (used by the overview stat cards: Certifications to Review / High-Priority).
+// The Certifications-to-Review / High-Priority shortcut cards were removed
+// with the Illness & Priority section. Kept as a no-op so nothing breaks.
 window.jumpToHealthFilter = function (filter) {
-    window.switchHealthSubTab('priority');
-    const chip = document.querySelector(`.health-filter-chip[data-health-filter="${filter}"]`);
-    if (chip) window.setHealthMgmtFilter(filter, chip);
+    return;
 };
 
 // ── Archive Function helpers ────────────────────────────────────────────────

@@ -1081,7 +1081,7 @@
                 
                 <div style="margin-bottom: 0; border-bottom: 2px solid #1e293b; padding-bottom: 15px;">
                     <h3 style="margin: 0; color: #1e293b; font-size: 1.2rem;">Health Records Management</h3>
-                    <p style="margin: 5px 0 0; color: #52525b;">Approve senior checkup appointments, review submitted medical certifications, and set each senior's official health condition and priority level</p>
+                    <p style="margin: 5px 0 0; color: #52525b;">Approve senior checkup appointments, then mark approved visits as done</p>
                 </div>
 
                 <!-- Health Overview — live counts, clickable shortcuts -->
@@ -1100,37 +1100,9 @@
                             <p>Approved — Awaiting Visit</p>
                         </div>
                     </div>
-                    <div class="emp-dash-stat" style="--accent:#3b82f6; cursor:pointer;" onclick="window.jumpToHealthFilter('pending')" title="Review submitted medical certifications">
-                        <div class="icon" style="background:#eff6ff; color:#2563eb;"><i class="fas fa-file-medical"></i></div>
-                        <div style="min-width:0;">
-                            <h3 id="healthStatPendingCert">0</h3>
-                            <p>Certifications to Review</p>
-                        </div>
-                    </div>
-                    <div class="emp-dash-stat" style="--accent:#8b5cf6; cursor:pointer;" onclick="window.jumpToHealthFilter('high')" title="Verified seniors currently marked High Priority">
-                        <div class="icon" style="background:#f5f3ff; color:#7c3aed;"><i class="fas fa-heart-pulse"></i></div>
-                        <div style="min-width:0;">
-                            <h3 id="healthStatHighPrio">0</h3>
-                            <p>High-Priority Seniors</p>
-                        </div>
-                    </div>
                 </div>
 
-                <!-- Sub-tab navigation (keeps the tab manageable — one workflow at a time) -->
-                <div style="display: flex; gap: 6px; background: #f1f5f9; padding: 6px; border-radius: 10px; border: 1px solid #e2e8f0; margin-bottom: 24px; width: fit-content; max-width: 100%; flex-wrap: wrap;">
-                    <button type="button" id="healthSubTabBtnAppointments" onclick="window.switchHealthSubTab('appointments')"
-                        style="border: none; background: #1e293b; color: #ffffff; font-weight: 700; font-size: 0.85rem; padding: 9px 18px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 8px;">
-                        <i class="fas fa-calendar-check"></i> Appointment Requests
-                        <span id="healthSubTabCountAppointments" style="display: none; background: #ef4444; color: #ffffff; font-size: 0.72rem; font-weight: 800; border-radius: 999px; padding: 1px 8px;">0</span>
-                    </button>
-                    <button type="button" id="healthSubTabBtnPriority" onclick="window.switchHealthSubTab('priority')"
-                        style="border: none; background: transparent; color: #475569; font-weight: 700; font-size: 0.85rem; padding: 9px 18px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 8px;">
-                        <i class="fas fa-heart-pulse"></i> Illness &amp; Priority
-                        <span id="healthSubTabCountPriority" style="display: none; background: #ef4444; color: #ffffff; font-size: 0.72rem; font-weight: 800; border-radius: 999px; padding: 1px 8px;">0</span>
-                    </button>
-                </div>
-
-                <!-- SUB-TAB: Senior Appointment Requests (Booked by Seniors — Approve / Decline) -->
+                <!-- Senior Appointment Requests (Booked by Seniors — Approve / Decline) -->
                 <div id="healthSubAppointments">
                 <div style="background: #fafafa; border-radius: 6px; padding: 30px; border: 1px solid #d4d4d8;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; flex-wrap: wrap; gap: 15px; border-bottom: 2px solid #1e293b; padding-bottom: 15px;">
@@ -1145,34 +1117,6 @@
                     <div id="seniorApptRequestsContainer" style="display: flex; flex-direction: column; gap: 12px; max-height: 480px; overflow-y: auto; padding-right: 5px;">
                         <div style="text-align: center; color: #71717a; padding: 30px;">
                             Loading appointment requests...
-                        </div>
-                    </div>
-                </div>
-                </div>
-
-                <!-- SUB-TAB: Senior Illness & Priority Management (staff decision) -->
-                <div id="healthSubPriority" style="display: none;">
-                <div id="seniorHealthMgmtSection" style="background: #fafafa; border-radius: 6px; padding: 30px; border: 1px solid #d4d4d8;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; flex-wrap: wrap; gap: 15px; border-bottom: 2px solid #1e293b; padding-bottom: 15px;">
-                        <div>
-                            <h3 style="margin: 0; color: #1e293b; font-size: 1.15rem;">Senior Illness &amp; Priority Management</h3>
-                            <p style="margin: 4px 0 0; color: #52525b; font-size: 0.85rem;">Review each verified senior's uploaded <strong>medical certification</strong>, then set their official health condition and priority level &mdash; <strong>Low</strong>, <strong>Medium</strong> or <strong>High</strong>. Verified senior accounts only.</p>
-                        </div>
-                        <span id="healthCertPendingBadge" style="display: none; background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; padding: 6px 14px; border-radius: 20px; font-weight: 700; font-size: 0.8rem;"></span>
-                    </div>
-
-                    <!-- Filters + search -->
-                    <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 16px;">
-                        <button type="button" class="health-filter-chip active" data-health-filter="all" style="border:1px solid #cbd5e1; background:#ffffff; color:#334155; font-weight:700; font-size:0.78rem; padding:7px 14px; border-radius:20px; cursor:pointer;">All Verified Seniors</button>
-                        <button type="button" class="health-filter-chip" data-health-filter="pending" style="border:1px solid #cbd5e1; background:#ffffff; color:#334155; font-weight:700; font-size:0.78rem; padding:7px 14px; border-radius:20px; cursor:pointer;">Pending Certification</button>
-                        <button type="button" class="health-filter-chip" data-health-filter="illness" style="border:1px solid #cbd5e1; background:#ffffff; color:#334155; font-weight:700; font-size:0.78rem; padding:7px 14px; border-radius:20px; cursor:pointer;">With Illness</button>
-                        <button type="button" class="health-filter-chip" data-health-filter="high" style="border:1px solid #cbd5e1; background:#ffffff; color:#334155; font-weight:700; font-size:0.78rem; padding:7px 14px; border-radius:20px; cursor:pointer;">High Priority</button>
-                        <input type="text" id="healthSearchInput" placeholder="Search senior name, OSCA Sr. ID or illness..." style="flex:1; min-width:220px; padding:8px 12px; border:1px solid #cbd5e1; border-radius:8px; font-size:0.85rem; box-sizing:border-box; background:white;">
-                    </div>
-
-                    <div id="seniorHealthListContainer" style="display: flex; flex-direction: column; gap: 12px; max-height: 560px; overflow-y: auto; padding-right: 5px;">
-                        <div style="text-align: center; color: #71717a; padding: 30px;">
-                            Loading senior health records...
                         </div>
                     </div>
                 </div>
