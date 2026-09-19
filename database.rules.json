@@ -36,7 +36,7 @@
       ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'employee')"
     },
     "system": {
-      ".readc": "auth != null",
+      ".read": "auth != null",
       ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() === 'admin'"
     },
     "claims": {
