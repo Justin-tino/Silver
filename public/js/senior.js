@@ -2971,6 +2971,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let kycStream = null;
     let capturedFaceData = null;
+    // kycFaceConfirmed lives here (top of the KYC closure) so goToKycStep()
+    // — defined below — can safely reference it without TDZ errors.
+    let kycFaceConfirmed = false;
     let kycIdFrontData = null;
     let kycIdBackData = null;
     let kycMedCertData = null;
@@ -3660,6 +3663,14 @@ document.addEventListener('DOMContentLoaded', () => {
             if (backBtn) backBtn.innerHTML = hasKycMilestoneForm()
                 ? '<i class="fas fa-arrow-left"></i> Back to Benefit Form'
                 : '<i class="fas fa-arrow-left"></i> Back to Information';
+            // If the senior already has a scanned photo waiting for review,
+            // show it again so they can Retake or press OK.
+            // (Guarded: the review helpers are declared later in this closure.)
+            try {
+                if (typeof showKycFaceReview === 'function' && capturedFaceData && !kycFaceConfirmed) {
+                    showKycFaceReview();
+                }
+            } catch (e) { /* helpers not ready yet — harmless */ }
         } else if (step === 'health') {
             // Step 3: Health Condition / Illness (med cert upload lives here)
             step1Content.style.display = 'none';
@@ -3714,7 +3725,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const sidVal = getKycSeniorIdNumber();
         box.style.display = 'block';
         box.innerHTML = '<strong>Review before submitting</strong><br>'
-            + 'Face scan: ' + (capturedFaceData ? '<span class="ok">Captured</span>' : '<span class="missing">Missing</span>')
+            + 'Face scan: ' + ((!capturedFaceData) ? '<span class="missing">Missing</span>'
+                : (!kycFaceConfirmed ? '<span class="missing">Needs your OK — go back to Face Scan</span>'
+                    : '<span class="ok">Confirmed ✓</span>'))
             + ' &nbsp;•&nbsp; Health: <strong>' + illnessLabel + '</strong>'
             + ' &nbsp;•&nbsp; Med cert: ' + medLabel + '<br>'
             + 'Senior ID no.: <strong>' + (sidVal || '—') + '</strong>'
@@ -4051,8 +4064,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const kycHealthNextBtn = document.getElementById('kycHealthNextBtn');
     if (kycHealthNextBtn) {
         kycHealthNextBtn.addEventListener('click', () => {
-            if (!capturedFaceData) {
-                showToast('Please complete the Face Scan first.');
+            if (!capturedFaceData || !kycFaceConfirmed) {
+                showToast('Please complete the Face Scan first (scan, then press OK on your photo).');
                 goToKycStep(2);
                 return;
             }
@@ -4096,12 +4109,94 @@ document.addEventListener('DOMContentLoaded', () => {
     const kycFaceGuide = document.getElementById('kycFaceGuide');
     const kycCaptureFlash = document.getElementById('kycCaptureFlash');
     const kycCapturedPreview = document.getElementById('kycCapturedPreview');
+    const kycFaceReviewBox = document.getElementById('kycFaceReviewBox');
+    const kycRetakeBtn = document.getElementById('kycRetakeBtn');
+    const kycUsePhotoBtn = document.getElementById('kycUsePhotoBtn');
+
+    function showKycFaceReview() {
+        if (kycCapturedPreview) kycCapturedPreview.style.display = 'block';
+        if (kycFaceReviewBox) {
+            kycFaceReviewBox.style.display = 'block';
+            kycFaceReviewBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+    }
+    function hideKycFaceReview() {
+        if (kycFaceReviewBox) kycFaceReviewBox.style.display = 'none';
+        if (kycCapturedPreview) { kycCapturedPreview.style.display = 'none'; kycCapturedPreview.removeAttribute('src'); }
+    }
+    function setKycScanIdle(label) {
+        if (!kycScanFaceBtn) return;
+        kycScanFaceBtn.disabled = false;
+        kycScanFaceBtn.innerHTML = label || '<i class="fas fa-user-check"></i> Scan Your Face';
+    }
+    async function startKycCamera() {
+        try {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                showToast('⚠️ This device or browser does not support camera access.');
+                setKycScanIdle();
+                return false;
+            }
+            if (kycScanFaceBtn) {
+                kycScanFaceBtn.disabled = true;
+                kycScanFaceBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Starting Camera...';
+            }
+            // Front camera, mirror OFF — preview shows the true camera image.
+            kycStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: 640, height: 480 } });
+            kycVideo.style.transform = 'none';
+            kycVideo.srcObject = kycStream;
+            kycPlaceholder.style.display = 'none';
+            kycFaceGuide.classList.add('visible');
+            if (kycScanFaceBtn) {
+                kycScanFaceBtn.disabled = false;
+                kycScanFaceBtn.innerHTML = '<i class="fas fa-camera"></i> Tap to Capture';
+                kycScanFaceBtn.style.background = 'linear-gradient(135deg, #f59e0b, #d97706)';
+                kycScanFaceBtn.style.boxShadow = '0 6px 14px rgba(245, 158, 11, 0.3)';
+            }
+            return true;
+        } catch (err) {
+            showToast('⚠️ Camera access denied. Please allow camera permissions.');
+            console.error('Camera error:', err);
+            setKycScanIdle();
+            return false;
+        }
+    }
+    function stopKycCamera() {
+        if (kycStream) { kycStream.getTracks().forEach(t => t.stop()); kycStream = null; }
+        if (kycVideo) kycVideo.srcObject = null;
+        if (kycFaceGuide) kycFaceGuide.classList.remove('visible');
+    }
+
+    if (kycRetakeBtn) {
+        kycRetakeBtn.addEventListener('click', async () => {
+            // Discard the photo and let the senior scan again.
+            capturedFaceData = null;
+            kycFaceConfirmed = false;
+            hideKycFaceReview();
+            if (kycPlaceholder) kycPlaceholder.style.display = 'none';
+            setKycScanIdle('<i class="fas fa-camera"></i> Tap to Capture');
+            showToast('Photo discarded. Please scan your face again.');
+            await startKycCamera();
+        });
+    }
+    if (kycUsePhotoBtn) {
+        kycUsePhotoBtn.addEventListener('click', () => {
+            if (!capturedFaceData) {
+                showToast('Please scan your face first.');
+                return;
+            }
+            kycFaceConfirmed = true;
+            if (kycFaceReviewBox) kycFaceReviewBox.style.display = 'none';
+            goToKycStep('health');
+        });
+    }
 
     if (kycScanFaceBtn) {
         kycScanFaceBtn.addEventListener('click', async () => {
-            // If face already captured, go to Step 3 (Health Info) instead of re-submitting
+            // Face already captured AND senior already pressed OK → continue.
+            // If not yet confirmed, stay here and show the photo for review.
             if (capturedFaceData) {
-                goToKycStep('health');
+                if (kycFaceConfirmed) { goToKycStep('health'); return; }
+                showKycFaceReview();
                 return;
             }
 
@@ -4111,33 +4206,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            // Start camera
-            kycScanFaceBtn.disabled = true;
-            kycScanFaceBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Starting Camera...';
-
-            try {
-                kycStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: 640, height: 480 } });
-                kycVideo.srcObject = kycStream;
-                kycPlaceholder.style.display = 'none';
-                kycFaceGuide.classList.add('visible');
-
-                kycScanFaceBtn.disabled = false;
-                kycScanFaceBtn.innerHTML = '<i class="fas fa-camera"></i> Tap to Capture';
-                kycScanFaceBtn.style.background = 'linear-gradient(135deg, #f59e0b, #d97706)';
-                kycScanFaceBtn.style.boxShadow = '0 6px 14px rgba(245, 158, 11, 0.3)';
-            } catch (err) {
-                showToast('⚠️ Camera access denied. Please allow camera permissions.');
-                console.error('Camera error:', err);
-                kycScanFaceBtn.disabled = false;
-                kycScanFaceBtn.innerHTML = '<i class="fas fa-user-check"></i> Scan Your Face';
-            }
+            // Start camera (front lens, mirror OFF)
+            await startKycCamera();
         });
     }
 
     async function captureFaceAndSubmit() {
         if (!kycStream || !kycVideo || !kycCanvas) return;
 
-        // Capture frame
+        // Capture frame — NO mirroring: draw the frame exactly as the camera
+        // produced it, so the saved photo matches what the senior saw.
         kycCanvas.width = kycVideo.videoWidth;
         kycCanvas.height = kycVideo.videoHeight;
         const ctx = kycCanvas.getContext('2d');
@@ -4236,27 +4314,23 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // ── Face validated — proceed ───────────────────────────────────
+        // ── Face validated — show the photo for RETAKE / OK review ──────
+        // Do NOT auto-advance: the senior must see the scanned face and pick
+        // "Retake" or "OK — Use This Photo" first.
         capturedFaceData = kycCanvas.toDataURL('image/jpeg', 0.7);
+        kycFaceConfirmed = false;
 
         // Stop camera
-        kycStream.getTracks().forEach(t => t.stop());
-        kycStream = null;
-        kycVideo.srcObject = null;
-        kycFaceGuide.classList.remove('visible');
+        stopKycCamera();
 
-        // Show preview
-        if (kycCapturedPreview) {
-            kycCapturedPreview.src = capturedFaceData;
-            kycCapturedPreview.style.display = 'block';
-        }
+        // Show the scanned face + review box (Retake / OK — Use This Photo)
+        if (kycCapturedPreview) kycCapturedPreview.src = capturedFaceData;
+        showKycFaceReview();
+        showToast('Please check your photo. Press OK if it looks good, or Retake to scan again.');
 
         // Update button
-        kycScanFaceBtn.innerHTML = '<i class="fas fa-user-check"></i> Face Captured ✓';
+        kycScanFaceBtn.innerHTML = '<i class="fas fa-eye"></i> Review Your Photo';
         kycScanFaceBtn.disabled = false;
-
-        // Face captured — proceed to Step 3: Health Condition / Illness
-        goToKycStep('health');
     }
 
     function resetScanButton() {
@@ -4273,6 +4347,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!currentUserData) return;
         if (!capturedFaceData) {
             showToast('Please complete the Face Scan first.');
+            goToKycStep(2);
+            return;
+        }
+        if (!kycFaceConfirmed) {
+            // Senior scanned but never pressed OK — show the photo and stop.
+            showToast('Please confirm your scanned photo first (OK or Retake).');
             goToKycStep(2);
             return;
         }

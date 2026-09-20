@@ -10,7 +10,21 @@
 (function () {
     'use strict';
 
-    const MODELS_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
+    const MODEL_BASES = [
+        '/models',
+        'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights',
+        'https://justadudewhohacks.github.io/face-api.js/models',
+        'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights'
+    ];
+    const MODEL_BASE_TIMEOUT_MS = 20000; // don't hang forever on slow mobile data
+    const FACE_LIB_URLS = [
+        'https://cdnjs.cloudflare.com/ajax/libs/face-api.js/0.22.2/face-api.min.js',
+        'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js',
+        'https://unpkg.com/face-api.js@0.22.2/dist/face-api.min.js'
+    ];
+    // Smaller + far more tolerant on slow phones than the big 68-point net.
+    // Full 68-point net is only tried as a last resort.
+    let landmarkNetName = 'faceLandmark68TinyNet';
     const MATCH_THRESHOLD = 0.6;
 
     let seniorId = '';
@@ -19,6 +33,7 @@
     let modelsLoading = null;       // in-flight model load promise (dedupes retries)
     let referenceDescriptor = null; // cached — the stored photo never changes during the session
     let stream = null;
+    let preferredFacing = 'user'; // senior can toggle front/rear via Switch Camera
     let lastDistance = null;
     let lastSnapshot = '';
 
@@ -73,12 +88,34 @@
         });
         let data = {};
         try { data = await res.json(); } catch (e) { /* keep {} */ }
-        if (!res.ok) throw new Error((data && data.message) || 'Request failed. Please try again.');
+        if (!res.ok) {
+            const err = new Error((data && data.message) || 'Request failed. Please try again.');
+            if (data && data.reason) err.reason = data.reason; // e.g. ALREADY_ACTIVE
+            throw err;
+        }
         return data;
     }
 
     // ---- Step 1: find the senior account by OSCA / Senior ID ----
+    // Flow: senior types OSCA ID → server says ACTIVE (→ login, no face
+    // scan) or INACTIVE (→ ask for a face scan, then proceed to reactivation).
     const findAccountBtn = $('findAccountBtn');
+    function showActiveAccount(boxId) {
+        const el = $(boxId);
+        if (!el) return;
+        el.className = 'msg info';
+        el.innerHTML = '';
+        const span = document.createElement('span');
+        span.textContent = 'This account is still active, please proceed to login ';
+        const link = document.createElement('a');
+        link.href = '/';
+        link.textContent = 'Go to Login';
+        link.style.fontWeight = '800';
+        link.style.color = '#065f46';
+        el.appendChild(span);
+        el.appendChild(link);
+        el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
     async function findAccount() {
         const input = $('reactSeniorId');
         seniorId = (input && input.value ? input.value : '').trim();
@@ -87,20 +124,40 @@
             return;
         }
         setBusy(findAccountBtn, true);
-        setMsg('msg1', '', '');
+        setMsg('msg1', 'info', 'Looking up your account…');
         try {
-            const data = await postJson('/api/reactivation/start', { seniorId });
+            let data = null;
+            try {
+                data = await postJson('/api/reactivation/start', { seniorId });
+            } catch (lookupErr) {
+                // Active accounts must NOT do a face scan — send them to login.
+                if ((lookupErr && lookupErr.reason) === 'ALREADY_ACTIVE' ||
+                    /still active/i.test(String((lookupErr && lookupErr.message) || ''))) {
+                    showActiveAccount('msg1');
+                } else {
+                    setMsg('msg1', 'err', (lookupErr && lookupErr.message) || 'Could not find your account. Please try again.');
+                }
+                return;
+            }
             token = data.token || '';
             if (!token) throw new Error('Could not start the face scan. Please try again.');
-            if (data.name) {
-                $('faceHint').innerHTML = 'Hello, <strong>' + (data.name || 'Senior Citizen') + '</strong>! (OSCA ID ' +
-                    (data.seniorId || seniorId) + ') Allow camera access, look straight at the camera with good light, then press <strong>Start Camera</strong> and <strong>Scan My Face</strong>.';
+            referenceDescriptor = null; // new senior ID → drop any cached face
+            lastDistance = null;
+            lastSnapshot = '';
+            if ($('scanBtn')) $('scanBtn').disabled = true;
+            if ($('submitBtn')) $('submitBtn').disabled = true;
+            if (data.name || data.seniorId) {
+                $('faceHint').innerHTML = 'Hello, <strong>' + escapeHtml(data.name || 'Senior Citizen') + '</strong>! (OSCA ID ' +
+                    escapeHtml(data.seniorId || seniorId) + ') This account is <strong>inactive</strong>. ' +
+                    'Please scan your face to confirm it is really you, then press <strong>Send Reactivation Request</strong>.';
             }
-            setMsg('msg1', 'ok', 'Account found! Please continue to the face scan.');
+            setMsg('msg1', 'ok', 'Account found! This account is inactive — please continue to the face scan.');
             // Move on right away — face recognition loads in the background on Step 2.
             showStep(2);
             setMsg('msg2', 'info', 'Loading face recognition… please wait a moment.');
             loadModelsInBackground();
+            // Auto-open the FRONT camera so the senior only has to look + scan.
+            startCamera(true);
         } catch (err) {
             setMsg('msg1', 'err', err.message);
         } finally {
@@ -114,7 +171,24 @@
         if (e.key === 'Enter') { e.preventDefault(); findAccount(); }
     });
 
-    // ---- face-api.js helpers (same library + models as the KYC tab) ----
+    // ---- face-api.js helpers ----
+    function escapeHtml(s) {
+        return String(s == null ? '' : s)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+    function loadScriptOnce(src) {
+        return new Promise((resolve, reject) => {
+            if (document.querySelector('script[data-faceapi="' + src + '"]')) return resolve();
+            const s = document.createElement('script');
+            s.src = src;
+            s.async = true;
+            s.setAttribute('data-faceapi', src);
+            s.onload = () => resolve();
+            s.onerror = () => { s.remove(); reject(new Error('script:' + src)); };
+            document.head.appendChild(s);
+        });
+    }
     // The face-api.js script tag loads from a CDN — it may not be ready the
     // moment Step 2 shows, so wait for the global to appear before giving up.
     function waitForFaceApi(timeoutMs) {
@@ -128,48 +202,141 @@
         });
     }
 
-    async function loadModelsInBackground() {
-        if (modelsLoaded) { setMsg('msg2', '', ''); return; }
-        if (modelsLoading) { await modelsLoading; return; }
-        modelsLoading = (async () => {
-            try {
-                setMsg('msg2', 'info', 'Loading face recognition… this takes a few seconds on first use.');
-                await waitForFaceApi(15000);
-                await faceapi.nets.tinyFaceDetector.loadFromUri(MODELS_URL);
-                await faceapi.nets.faceLandmark68Net.loadFromUri(MODELS_URL);
-                await faceapi.nets.faceRecognitionNet.loadFromUri(MODELS_URL);
-                modelsLoaded = true;
-                setMsg('msg2', 'info', 'Ready! Press Start Camera, then Scan My Face.');
-            } catch (err) {
-                console.error('Face model load failed:', err);
-                modelsLoading = null; // allow the senior to retry by pressing Scan My Face
-                setMsg('msg2', 'err', 'Face recognition could not load (internet is needed to load it once). Press "Scan My Face" to try again — or visit the OSCA office for help.');
-            }
-        })();
-        await modelsLoading;
-        if (modelsLoaded) modelsLoading = null;
+    async function ensureFaceApiLoaded() {
+        if (typeof faceapi !== 'undefined') return;
+        try { await waitForFaceApi(4000); return; } catch (e) { /* try mirrors */ }
+        let lastErr = null;
+        for (const url of FACE_LIB_URLS) {
+            try { await loadScriptOnce(url); await waitForFaceApi(12000); return; }
+            catch (e) { lastErr = e; }
+        }
+        throw lastErr || new Error('library');
     }
 
-    const startCamBtn = $('startCamBtn');
-    if (startCamBtn) startCamBtn.addEventListener('click', async () => {
-        setMsg('msg2', '', '');
+    function withTimeout(promise, ms, label) {
+        return Promise.race([
+            promise,
+            new Promise((_, reject) => setTimeout(() => reject(new Error('timeout:' + (label || 'load'))), ms || MODEL_BASE_TIMEOUT_MS))
+        ]);
+    }
+    async function tryLoadModelsFrom(base) {
+        await withTimeout(faceapi.nets.tinyFaceDetector.loadFromUri(base), MODEL_BASE_TIMEOUT_MS, base);
+        landmarkNetName = 'faceLandmark68TinyNet';
+        if (faceapi.nets.faceLandmark68TinyNet) {
+            try { await withTimeout(faceapi.nets.faceLandmark68TinyNet.loadFromUri(base), MODEL_BASE_TIMEOUT_MS, base); }
+            catch (e) {
+                await withTimeout(faceapi.nets.faceLandmark68Net.loadFromUri(base), MODEL_BASE_TIMEOUT_MS, base);
+                landmarkNetName = 'faceLandmark68Net';
+            }
+        } else {
+            await withTimeout(faceapi.nets.faceLandmark68Net.loadFromUri(base), MODEL_BASE_TIMEOUT_MS, base);
+            landmarkNetName = 'faceLandmark68Net';
+        }
+        await withTimeout(faceapi.nets.faceRecognitionNet.loadFromUri(base), MODEL_BASE_TIMEOUT_MS, base);
+    }
+
+    async function loadModelsInBackground() {
+        if (modelsLoaded) { setMsg('msg2', '', ''); return true; }
+        if (modelsLoading) { try { await modelsLoading; } catch (e) { /* handled */ } return modelsLoaded; }
+        modelsLoading = (async () => {
+            setMsg('msg2', 'info', 'Loading face recognition… this takes a few seconds on first use. Please keep this page open.');
+            await ensureFaceApiLoaded();
+            let lastErr = null;
+            for (const base of MODEL_BASES) {
+                try {
+                    await tryLoadModelsFrom(base);
+                    modelsLoaded = true;
+                    setMsg('msg2', 'info', 'Ready! Look straight at the front camera with good light, then press Scan My Face.');
+                    return true;
+                } catch (e) {
+                    lastErr = e;
+                    console.warn('Face models failed from ' + base + ':', e);
+                }
+            }
+            throw lastErr || new Error('models');
+        })();
+        try {
+            await modelsLoading;
+        } catch (err) {
+            console.error('Face model load failed:', err);
+            setMsg('msg2', 'err', 'Face recognition could not load (internet is needed to load it once). Press "Scan My Face" to try again — or visit the OSCA office for help.');
+            return false;
+        } finally {
+            modelsLoading = null; // allow retry via Scan My Face
+        }
+        return modelsLoaded;
+    }
+
+    function stopCamera() {
+        if (stream) { try { stream.getTracks().forEach(t => t.stop()); } catch (e) { /* noop */ } stream = null; }
+        const v = $('liveVideo');
+        if (v) { try { v.pause(); } catch (e) { /* noop */ } v.srcObject = null; }
+    }
+
+    // Always prefer the FRONT (selfie) camera, with a Switch Camera toggle so
+    // a senior stuck on the wrong lens (like the screenshot) can flip it.
+    async function startCamera(silent) {
+        if (!silent) setMsg('msg2', '', '');
         try {
             if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
                 throw new Error('This device or browser does not support camera access. Please use a phone or computer with a camera.');
             }
-            stream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
-                audio: false
-            });
+            stopCamera();
+            const want = preferredFacing === 'environment' ? 'environment' : 'user';
+            const attempts = want === 'environment' ? [
+                { video: { facingMode: { exact: 'environment' }, width: { ideal: 640 }, height: { ideal: 480 } }, audio: false },
+                { video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } }, audio: false },
+                { video: { facingMode: 'environment' }, audio: false },
+                { video: true, audio: false }
+            ] : [
+                { video: { facingMode: { exact: 'user' }, width: { ideal: 640 }, height: { ideal: 480 } }, audio: false },
+                { video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }, audio: false },
+                { video: { facingMode: 'user' }, audio: false },
+                { video: true, audio: false }
+            ];
+            let lastErr = null;
+            for (const constraints of attempts) {
+                try { stream = await navigator.mediaDevices.getUserMedia(constraints); lastErr = null; break; }
+                catch (e) { lastErr = e; }
+            }
+            if (!stream) throw lastErr || new Error('Camera unavailable.');
             const video = $('liveVideo');
+            video.muted = true;
+            video.setAttribute('playsinline', 'true');
+            // Mirror is OFF on purpose: seniors were confused because the
+            // preview moved the opposite way. Show the true camera image.
+            video.style.transform = 'none';
             video.srcObject = stream;
-            await video.play().catch(() => {});
-            $('scanBtn').disabled = false;
-            setMsg('msg2', 'info', 'Camera is on. Look straight at the camera, then press Scan My Face.');
+            try { await video.play(); } catch (e) { /* autoplay policy */ }
+            await new Promise((resolve) => {
+                if (video.readyState >= 2 && video.videoWidth > 0) return resolve();
+                const to = setTimeout(resolve, 2500);
+                video.addEventListener('loadeddata', () => { clearTimeout(to); resolve(); }, { once: true });
+            });
+            if ($('scanBtn')) $('scanBtn').disabled = false;
+            if ($('switchCamBtn')) $('switchCamBtn').style.display = 'block';
+            setMsg('msg2', 'info', want === 'environment'
+                ? 'Rear camera is on. If you see your fingers or the room instead of your face, press Switch Camera to use the front camera, then press Scan My Face.'
+                : 'Front camera is on. Look straight at the camera with good light on your face, then press Scan My Face.');
+            return true;
         } catch (err) {
             console.error('Camera error:', err);
-            setMsg('msg2', 'err', 'Could not open the camera. Please allow camera permission in your browser, or visit the OSCA office for help.');
+            const blocked = err && err.name === 'NotAllowedError';
+            setMsg('msg2', 'err', blocked
+                ? 'Camera permission was blocked. Please tap the lock/camera icon in your browser address bar, allow the camera, then press Start Camera again.'
+                : 'Could not open the ' + (preferredFacing === 'environment' ? 'rear' : 'front') + ' camera. Please allow camera permission in your browser, try Switch Camera, or visit the OSCA office for help.');
+            return false;
         }
+    }
+    // Backwards-compatible alias (older cached HTML may call startFrontCamera).
+    function startFrontCamera(silent) { return startCamera(silent); }
+
+    const startCamBtn = $('startCamBtn');
+    if (startCamBtn) startCamBtn.addEventListener('click', () => startCamera(false));
+    const switchCamBtn = $('switchCamBtn');
+    if (switchCamBtn) switchCamBtn.addEventListener('click', () => {
+        preferredFacing = preferredFacing === 'environment' ? 'user' : 'environment';
+        startCamera(false);
     });
 
     function loadImage(src) {
@@ -187,11 +354,78 @@
     }
 
     // ---- Step 2: scan + submit ----
-    // Detector tuned for seniors' webcams: larger input + lower score threshold
-    // catches faces at typical chair-to-webcam distance far more reliably.
-    function detectorOptions() {
-        return new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.4 });
+    // Two-pass detector: first a fast/small pass (works on slow phones and
+    // small faces), then the precise pass only if the first misses.
+    function detectorOptionsList() {
+        return [
+            new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.3 }),
+            new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.4 }),
+            new faceapi.TinyFaceDetectorOptions({ inputSize: 512, scoreThreshold: 0.35 })
+        ];
     }
+    function withLandmarks(detection) {
+        if (landmarkNetName === 'faceLandmark68TinyNet' && typeof detection.withFaceLandmarks === 'function') {
+            try { return detection.withFaceLandmarks(true); } catch (e) { /* fall through */ }
+        }
+        return detection.withFaceLandmarks();
+    }
+
+    async function detectFaceWithDescriptors(input) {
+        const list = detectorOptionsList();
+        for (const opts of list) {
+            try {
+                const det = await withLandmarks(faceapi.detectSingleFace(input, opts)).withFaceDescriptor();
+                if (det) return det;
+            } catch (e) { /* try next detector size */ }
+        }
+        return null;
+    }
+    function detectorOptions() { return detectorOptionsList()[1]; }
+
+    function hidePhotoPreview() {
+        const wrap = $('photoPreviewWrap');
+        if (wrap) wrap.classList.remove('show');
+        const img = $('photoPreviewImg');
+        if (img) img.removeAttribute('src');
+        const m = $('photoPreviewMatch');
+        if (m) m.textContent = '';
+    }
+    function showPhotoPreview(dataUrl, pctText) {
+        const wrap = $('photoPreviewWrap');
+        const img = $('photoPreviewImg');
+        const m = $('photoPreviewMatch');
+        // The saved photo is never mirrored — show exactly what staff gets.
+        if (img) img.src = dataUrl;
+        if (m) m.textContent = pctText || '';
+        if (wrap) {
+            wrap.classList.add('show');
+            wrap.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+    }
+
+    let photoAccepted = false; // senior must press "Okay, Use This Photo"
+    const retakeBtn = $('retakeBtn');
+    if (retakeBtn) retakeBtn.addEventListener('click', () => {
+        photoAccepted = false;
+        lastDistance = null;
+        lastSnapshot = '';
+        hidePhotoPreview();
+        if ($('submitBtn')) $('submitBtn').disabled = true;
+        if ($('matchText')) $('matchText').textContent = '';
+        if ($('matchFill')) $('matchFill').style.width = '0';
+        setMsg('msg2', 'info', 'Photo discarded. Look straight at the camera with good light, then press Scan My Face again.');
+    });
+    const okPhotoBtn = $('okPhotoBtn');
+    if (okPhotoBtn) okPhotoBtn.addEventListener('click', () => {
+        if (!lastSnapshot || lastDistance === null || lastDistance > MATCH_THRESHOLD) {
+            setMsg('msg2', 'err', 'Please scan your face successfully first.');
+            return;
+        }
+        photoAccepted = true;
+        hidePhotoPreview();
+        if ($('submitBtn')) $('submitBtn').disabled = false;
+        setMsg('msg2', 'ok', 'Photo accepted! Now press "Send Reactivation Request" to send it to OSCA staff.');
+    });
 
     const scanBtn = $('scanBtn');
     if (scanBtn) scanBtn.addEventListener('click', async () => {
@@ -210,6 +444,8 @@
         $('matchText').textContent = '';
         $('matchFill').style.width = '0';
         $('submitBtn').disabled = true;
+        photoAccepted = false;
+        hidePhotoPreview();
         lastDistance = null;
 
         try {
@@ -221,7 +457,13 @@
                 const refData = await refRes.json().catch(() => ({}));
                 if (!refRes.ok) throw new Error((refData && refData.message) || 'Could not load your stored photo.');
                 const refImg = await loadImage(refData.referenceImage);
-                const refDet = await faceapi.detectSingleFace(refImg, detectorOptions()).withFaceLandmarks().withFaceDescriptor();
+                let refDet = null;
+                for (const opts of detectorOptionsList()) {
+                    try {
+                        refDet = await withLandmarks(faceapi.detectSingleFace(refImg, opts)).withFaceDescriptor();
+                        if (refDet) break;
+                    } catch (e) { /* try next detector size */ }
+                }
                 if (!refDet) throw new Error('We could not read your stored photo. Please visit the OSCA office for help.');
                 referenceDescriptor = refDet.descriptor;
             }
@@ -237,11 +479,11 @@
 
             // 3) Detect the live face from the camera (retry once — a single
             //    frame can catch a blink, a motion blur or a half-turned head).
-            let liveDet = await faceapi.detectSingleFace(video, detectorOptions()).withFaceLandmarks().withFaceDescriptor();
+            let liveDet = await detectFaceWithDescriptors(video);
             if (!liveDet) {
                 setMsg('msg2', 'info', 'Didn\u2019t catch your face yet — hold still, facing the light…');
                 await new Promise((r) => setTimeout(r, 700));
-                liveDet = await faceapi.detectSingleFace(video, detectorOptions()).withFaceLandmarks().withFaceDescriptor();
+                liveDet = await detectFaceWithDescriptors(video);
             }
             if (!liveDet) {
                 setMsg('msg2', 'err', 'No face detected. Please move closer, face the light, remove sunglasses/mask, and try again.');
@@ -254,16 +496,20 @@
             const pct = formatPercent(distance);
             $('matchFill').style.width = pct;
             if (distance <= MATCH_THRESHOLD) {
-                $('matchText').textContent = 'Match: ' + pct + ' ✓ — You may now send your request.';
-                setMsg('msg2', 'ok', 'Face matched your registration photo (' + pct + '). Press "Send Reactivation Request".');
-
-                // Snapshot the live frame for staff review.
+                $('matchText').textContent = 'Match: ' + pct + ' — look at your photo below.';
+                // Snapshot the live frame for staff review. Never mirrored,
+                // so the preview, the saved photo, and the camera all match.
                 const canvas = document.createElement('canvas');
                 canvas.width = video.videoWidth || 640;
                 canvas.height = video.videoHeight || 480;
-                canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
                 lastSnapshot = canvas.toDataURL('image/jpeg', 0.75);
-                $('submitBtn').disabled = false;
+                // Show the senior their own photo first — they choose Retake
+                // or Okay, Use This Photo. Submit stays locked until Okay.
+                showPhotoPreview(lastSnapshot, 'Face matched your registration photo (' + pct + ').');
+                setMsg('msg2', 'info', 'We found your face (' + pct + '). Is this photo okay? Press "Okay, Use This Photo" or "Retake".');
+                $('submitBtn').disabled = true;
             } else {
                 $('matchText').textContent = 'Match: ' + pct + ' — too low, please try again.';
                 setMsg('msg2', 'err', 'Face did not match (' + pct + '). Face the camera clearly with good light and try again — or visit the OSCA office for help.');
@@ -280,6 +526,11 @@
     if (submitBtn) submitBtn.addEventListener('click', async () => {
         if (!token || lastDistance === null || !lastSnapshot) {
             setMsg('msg2', 'err', 'Please scan your face successfully first.');
+            return;
+        }
+        if (!photoAccepted) {
+            setMsg('msg2', 'err', 'Please press "Okay, Use This Photo" first to confirm your scanned photo.');
+            showPhotoPreview(lastSnapshot, '');
             return;
         }
         setBusy(submitBtn, true);

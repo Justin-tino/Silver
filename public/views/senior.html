@@ -1609,6 +1609,9 @@
             height: 100%;
             object-fit: cover;
             display: block;
+            /* Mirror OFF: show the true camera image so left/right match reality.
+               Do NOT add scaleX(-1) here — seniors get confused by mirroring. */
+            transform: none !important;
         }
 
         .kyc-camera-placeholder {
@@ -1638,7 +1641,33 @@
             border-radius: 12px;
             border: 3px solid #22c55e;
             box-shadow: 0 4px 12px rgba(34, 197, 94, 0.2);
+            /* Preview photo is never mirrored — it matches the saved photo. */
+            transform: none !important;
         }
+
+        /* Face-scan review box: senior confirms the scanned photo */
+        .kyc-face-review-box {
+            width: 100%;
+            max-width: 400px;
+            background: #f0fdf4;
+            border: 2px solid #22c55e;
+            border-radius: 14px;
+            padding: 16px;
+            text-align: center;
+        }
+        .kyc-face-review-title { font-size: 1.05rem; font-weight: 800; color: #166534; margin: 0 0 6px; }
+        .kyc-face-review-title i { margin-right: 6px; }
+        .kyc-face-review-sub { font-size: 0.88rem; color: #475569; line-height: 1.55; margin: 0 0 12px; }
+        .kyc-face-review-sub strong { color: #166534; }
+        .kyc-face-review-btns { display: flex; gap: 10px; }
+        .kyc-face-review-btn {
+            flex: 1; padding: 13px 10px; border-radius: 10px; font-size: 1rem; font-weight: 700;
+            cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; border: none;
+        }
+        .kyc-face-review-btn.retake { background: #f1f5f9; color: #334155; border: 1.5px solid #cbd5e1; }
+        .kyc-face-review-btn.retake:hover { background: #e2e8f0; }
+        .kyc-face-review-btn.use { background: linear-gradient(135deg, #22c55e, #16a34a); color: #fff; box-shadow: 0 6px 14px rgba(34,197,94,0.3); }
+        .kyc-face-review-btn.use:hover { filter: brightness(1.05); }
 
         /* Face Guide Oval */
         .kyc-face-guide {
@@ -2892,7 +2921,21 @@
                                         <div class="kyc-capture-flash" id="kycCaptureFlash"></div>
                                         <canvas id="kycCanvas" style="display: none;"></canvas>
                                     </div>
-                                    <img id="kycCapturedPreview" class="kyc-captured-preview" style="display: none;">
+                                    <img id="kycCapturedPreview" class="kyc-captured-preview" style="display: none;" alt="Your scanned face photo">
+                                    <!-- Review box: senior sees the scanned face and picks
+                                         Retake or OK before continuing (no auto-advance). -->
+                                    <div id="kycFaceReviewBox" class="kyc-face-review-box" style="display: none;">
+                                        <p class="kyc-face-review-title"><i class="fas fa-image"></i> Is this photo okay?</p>
+                                        <p class="kyc-face-review-sub">Look at your scanned photo above. If your face is clear and centered, press <strong>OK — Use This Photo</strong>. If it is blurry or cut off, press <strong>Retake</strong>.</p>
+                                        <div class="kyc-face-review-btns">
+                                            <button type="button" id="kycRetakeBtn" class="kyc-face-review-btn retake">
+                                                <i class="fas fa-rotate-left"></i> Retake
+                                            </button>
+                                            <button type="button" id="kycUsePhotoBtn" class="kyc-face-review-btn use">
+                                                <i class="fas fa-circle-check"></i> OK — Use This Photo
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <button type="button" id="kycScanFaceBtn" class="kyc-scan-btn">

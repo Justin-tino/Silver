@@ -801,10 +801,10 @@ async function checkReactivationEligibility(u, uid) {
         return { ok: false, code: 400, message: 'Your registration was not approved. Please visit the OSCA office for help.' };
     }
     if (status === 'Active' && (!life || life === 'Active')) {
-        return { ok: false, code: 400, message: 'Your account is already active. You can log in directly.' };
+        return { ok: false, code: 400, message: 'This account is still active, please proceed to login', reason: 'ALREADY_ACTIVE' };
     }
     if (!(status === 'Inactive' || life === 'Inactive')) {
-        return { ok: false, code: 400, message: 'Your account is already active. You can log in directly.' };
+        return { ok: false, code: 400, message: 'This account is still active, please proceed to login', reason: 'ALREADY_ACTIVE' };
     }
     if (!u.kycFaceImage) {
         return { ok: false, code: 400, message: 'No face scan is on file for this account. Please visit the OSCA office for assisted reactivation.' };
@@ -838,7 +838,7 @@ app.post('/api/reactivation/start', async (req, res) => {
             return res.status(404).json({ success: false, message: 'No senior record matches that OSCA ID. Please check the ID given at registration, or visit the OSCA office for help.' });
         }
         const check = await checkReactivationEligibility(u, uid);
-        if (!check.ok) return res.status(check.code).json({ success: false, message: check.message });
+        if (!check.ok) return res.status(check.code).json({ success: false, message: check.message, reason: check.reason || 'NOT_ELIGIBLE' });
 
         // Issue a short-lived token bound to that account — the face scan and the
         // resulting staff review request are attached to this exact senior record.
@@ -891,7 +891,7 @@ app.post('/api/reactivation/submit', async (req, res) => {
         const u = userSnap.val() || {};
         if ((u.status || '') === 'Active' && (!u.lifeStatus || u.lifeStatus === 'Active')) {
             reactivationChallenges.delete(token);
-            return res.status(400).json({ success: false, message: 'Your account is already active. You can log in directly.' });
+            return res.status(400).json({ success: false, message: 'This account is still active, please proceed to login', reason: 'ALREADY_ACTIVE' });
         }
         const existing = await admin.database().ref(`reactivationRequests/${c.uid}`).once('value');
         if (existing.exists() && existing.val() && existing.val().status === 'Pending') {
