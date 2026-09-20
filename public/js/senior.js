@@ -1632,36 +1632,36 @@ document.addEventListener('DOMContentLoaded', () => {
                         <input type="text" id="child1" placeholder="Child 1 Full Name">
                     </div>
                     <div class="form-group">
-                        <label for="child6">6.</label>
-                        <input type="text" id="child6" placeholder="Child 6 Full Name">
-                    </div>
-                    <div class="form-group">
                         <label for="child2">2.</label>
                         <input type="text" id="child2" placeholder="Child 2 Full Name">
-                    </div>
-                    <div class="form-group">
-                        <label for="child7">7.</label>
-                        <input type="text" id="child7" placeholder="Child 7 Full Name">
                     </div>
                     <div class="form-group">
                         <label for="child3">3.</label>
                         <input type="text" id="child3" placeholder="Child 3 Full Name">
                     </div>
                     <div class="form-group">
-                        <label for="child8">8.</label>
-                        <input type="text" id="child8" placeholder="Child 8 Full Name">
-                    </div>
-                    <div class="form-group">
                         <label for="child4">4.</label>
                         <input type="text" id="child4" placeholder="Child 4 Full Name">
                     </div>
                     <div class="form-group">
-                        <label for="child9">9.</label>
-                        <input type="text" id="child9" placeholder="Child 9 Full Name">
-                    </div>
-                    <div class="form-group">
                         <label for="child5">5.</label>
                         <input type="text" id="child5" placeholder="Child 5 Full Name">
+                    </div>
+                    <div class="form-group">
+                        <label for="child6">6.</label>
+                        <input type="text" id="child6" placeholder="Child 6 Full Name">
+                    </div>
+                    <div class="form-group">
+                        <label for="child7">7.</label>
+                        <input type="text" id="child7" placeholder="Child 7 Full Name">
+                    </div>
+                    <div class="form-group">
+                        <label for="child8">8.</label>
+                        <input type="text" id="child8" placeholder="Child 8 Full Name">
+                    </div>
+                    <div class="form-group">
+                        <label for="child9">9.</label>
+                        <input type="text" id="child9" placeholder="Child 9 Full Name">
                     </div>
                     <div class="form-group">
                         <label for="child10">10.</label>
@@ -3326,36 +3326,36 @@ document.addEventListener('DOMContentLoaded', () => {
                     <input type="text" id="child1" placeholder="Child 1 Full Name">
                 </div>
                 <div class="form-group">
-                    <label for="child6">6.</label>
-                    <input type="text" id="child6" placeholder="Child 6 Full Name">
-                </div>
-                <div class="form-group">
                     <label for="child2">2.</label>
                     <input type="text" id="child2" placeholder="Child 2 Full Name">
-                </div>
-                <div class="form-group">
-                    <label for="child7">7.</label>
-                    <input type="text" id="child7" placeholder="Child 7 Full Name">
                 </div>
                 <div class="form-group">
                     <label for="child3">3.</label>
                     <input type="text" id="child3" placeholder="Child 3 Full Name">
                 </div>
                 <div class="form-group">
-                    <label for="child8">8.</label>
-                    <input type="text" id="child8" placeholder="Child 8 Full Name">
-                </div>
-                <div class="form-group">
                     <label for="child4">4.</label>
                     <input type="text" id="child4" placeholder="Child 4 Full Name">
                 </div>
                 <div class="form-group">
-                    <label for="child9">9.</label>
-                    <input type="text" id="child9" placeholder="Child 9 Full Name">
-                </div>
-                <div class="form-group">
                     <label for="child5">5.</label>
                     <input type="text" id="child5" placeholder="Child 5 Full Name">
+                </div>
+                <div class="form-group">
+                    <label for="child6">6.</label>
+                    <input type="text" id="child6" placeholder="Child 6 Full Name">
+                </div>
+                <div class="form-group">
+                    <label for="child7">7.</label>
+                    <input type="text" id="child7" placeholder="Child 7 Full Name">
+                </div>
+                <div class="form-group">
+                    <label for="child8">8.</label>
+                    <input type="text" id="child8" placeholder="Child 8 Full Name">
+                </div>
+                <div class="form-group">
+                    <label for="child9">9.</label>
+                    <input type="text" id="child9" placeholder="Child 9 Full Name">
                 </div>
                 <div class="form-group">
                     <label for="child10">10.</label>
