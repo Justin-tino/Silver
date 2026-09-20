@@ -117,46 +117,7 @@
                 </div>
             </div>
 
-            <!-- Senior Priority Level & Pill Request Monitor (Admin) -->
-            <div style="background: white; padding: 25px; border-radius: 12px; margin-bottom: 30px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
-                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 20px; border-bottom: 1px solid #f1f5f9; padding-bottom: 15px;">
-                    <div>
-                        <h3 style="font-size: 1.15rem; color: #1e293b; font-weight: 700; margin: 0;">
-                            <i class="fas fa-heartbeat" style="color: #ef4444; margin-right: 8px;"></i> Senior Priority & Requested Pills Monitor
-                        </h3>
-                        <p style="margin: 4px 0 0; color: #64748b; font-size: 0.85rem;">
-                            Administrative real-time oversight of senior citizens' priority levels (High, Medium, Low) and pending medication refill requests.
-                        </p>
-                    </div>
-                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                        <button class="admin-priority-filter-btn" onclick="window.filterAdminPriority('high', this)" style="padding: 6px 14px; border-radius: 20px; border: 1px solid #fca5a5; background: #fef2f2; color: #dc2626; font-size: 0.8rem; font-weight: 600; cursor: pointer;">High Priority Only</button>
-                        <button class="admin-priority-filter-btn" onclick="window.filterAdminPriority('pills', this)" style="padding: 6px 14px; border-radius: 20px; border: 1px solid #93c5fd; background: #eff6ff; color: #1d4ed8; font-size: 0.8rem; font-weight: 600; cursor: pointer;">Requested Pills Only</button>
-                        <button id="adminToggleSeeAllBtn" onclick="window.toggleAdminSeeAllSeniors()" style="padding: 6px 14px; border-radius: 20px; border: 1px solid #cbd5e1; background: #f8fafc; color: #475569; font-size: 0.8rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;"><i class="fas fa-eye"></i> See all seniors</button>
-                    </div>
-                </div>
-
-                <div id="adminPriorityMonitorContainer">
-                    <div style="text-align: center; color: #64748b; padding: 25px 0;">
-                        <i class="fas fa-spinner fa-spin" style="font-size: 1.5rem; color: #cbd5e1; margin-bottom: 8px;"></i><br>
-                        Loading senior priority & medication monitor...
-                    </div>
-                </div>
-            </div>
-
-            <div class="action-cards" style="grid-template-columns: repeat(2, 1fr);">
-                <div class="action-card bg-blue"
-                    onclick="switchTab('users', document.querySelectorAll('.nav-pill')[3])" style="cursor: pointer;">
-                    <i class="fas fa-users"></i>
-                    <h3>Manage Users</h3>
-                    <p>View and manage all users</p>
-                </div>
-                <div class="action-card bg-purple"
-                    onclick="switchTab('face', document.querySelectorAll('.nav-pill')[4])" style="cursor: pointer;">
-                    <i class="fas fa-user-check"></i>
-                    <h3>Verified Seniors</h3>
-                    <p>KYC-approved senior registry</p>
-                </div>
-            </div>
+            <!-- Senior Priority Level & Pill Request Monitor (Admin) — removed -->
         </div>
 
         <!-- TAB: APPOINTMENTS -->
