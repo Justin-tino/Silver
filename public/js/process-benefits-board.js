@@ -86,7 +86,157 @@
       setText('pbCountPending', cPend); setText('pbCountHistory', cHis);
       var badge = $('approvedClaimsBadge');
       if (badge) { badge.textContent = cPay; badge.style.display = cPay > 0 ? 'inline-block' : 'none'; }
+      updateReportStats();
     } catch (e) {}
+  }
+
+  // ── Generate Reports: appointments + benefits totals ───────────────────────
+  // Live totals computed from the same data the board renders:
+  //   queue  → seniors who made appointments / successful / pending / declined
+  //   users  → total monthly pension configured across all seniors (PHP)
+  //   claims → total claimed assistance (paid/claimed claims, PHP)
+  function fmtPhp(v) { return 'PHP ' + Number(v || 0).toLocaleString(); }
+
+  function computeReportStats() {
+    var users = window.lastUsersData || {};
+    var queues = window.lastQueuesData || {};
+    var claims = window.lastClaimsData || {};
+    var totalAppt = 0, successful = 0, pending = 0, declined = 0;
+    var seniorsWhoBooked = {};
+    Object.values(queues).forEach(function (q) {
+      if (!q) return;
+      totalAppt++;
+      var key = q.uid || q.seniorUid || q.seniorId || '';
+      if (key) seniorsWhoBooked[key] = true;
+      var s = String(q.status || 'Pending');
+      // Successful = approved and/or attended; Pending = pending/rescheduled;
+      // Declined = declined by staff (same buckets the admin dashboard uses).
+      if (s === 'Approved' || s === 'Attended') successful++;
+      else if (s === 'Declined') declined++;
+      else pending++;
+    });
+    var pensionTotal = 0, withPension = 0;
+    Object.values(users).forEach(function (u) {
+      if (!u || u.role !== 'senior') return;
+      var amt = Number(u.pensionAmount) || 0;
+      if (amt > 0) { pensionTotal += amt; withPension++; }
+    });
+    var assistanceTotal = 0, claimedCount = 0;
+    Object.values(claims).forEach(function (c) {
+      if (!c) return;
+      var st = String(c.status || '');
+      if (st === 'Claimed' || st === 'Paid') {
+        claimedCount++;
+        assistanceTotal += Number(c.paidAmount) || 0;
+      }
+    });
+    return {
+      totalAppt: totalAppt,
+      totalSeniors: Object.keys(seniorsWhoBooked).length,
+      successful: successful, pending: pending, declined: declined,
+      pensionTotal: pensionTotal, withPension: withPension,
+      assistanceTotal: assistanceTotal, claimedCount: claimedCount,
+      combinedTotal: pensionTotal + assistanceTotal
+    };
+  }
+
+  function updateReportStats() {
+    try {
+      var s = computeReportStats();
+      setText('pbRepTotalSeniors', s.totalSeniors);
+      setText('pbRepTotalAppt', s.totalAppt);
+      setText('pbRepSuccessful', s.successful);
+      setText('pbRepPending', s.pending);
+      setText('pbRepDeclined', s.declined);
+      setText('pbRepPensionTotal', fmtPhp(s.pensionTotal));
+      setText('pbRepAssistanceTotal', fmtPhp(s.assistanceTotal));
+      setText('pbRepCombined', fmtPhp(s.combinedTotal));
+    } catch (e) { /* never break the board */ }
+  }
+  window.updatePbReportStats = updateReportStats;
+
+  function queueSeniorOf(q, users) {
+    return users[q.uid || q.seniorUid || ''] || null;
+  }
+
+  function generateReportCsv() {
+    try {
+      var users = window.lastUsersData || {};
+      var queues = window.lastQueuesData || {};
+      var claims = window.lastClaimsData || {};
+      var s = computeReportStats();
+      var d = new Date();
+      var L = [];
+      L.push(['SilverCare — OSCA Magalang · Process Benefits Report']);
+      L.push(['Generated', d.toLocaleString(), 'By', (window.currentStaffName || 'OSCA Staff')]);
+      L.push([]);
+      L.push(['APPOINTMENTS SUMMARY']);
+      L.push(['Seniors Who Made Appointments', s.totalSeniors]);
+      L.push(['Total Appointments Made', s.totalAppt]);
+      L.push(['Successful Appointments', s.successful]);
+      L.push(['Pending Appointments', s.pending]);
+      L.push(['Declined Appointments', s.declined]);
+      L.push([]);
+      L.push(['BENEFITS SUMMARY']);
+      L.push(['Total Monthly Pension Given (all seniors)', fmtPhp(s.pensionTotal)]);
+      L.push(['Seniors With Monthly Pension', s.withPension]);
+      L.push(['Total Claimed Assistance', fmtPhp(s.assistanceTotal)]);
+      L.push(['Assistance Claims Paid', s.claimedCount]);
+      L.push(['Combined Total (Pension + Assistance)', fmtPhp(s.combinedTotal)]);
+      L.push([]);
+      L.push(['APPOINTMENT DETAILS']);
+      L.push(['Senior Name', 'OSCA ID', 'Service', 'Queue #', 'Status', 'Date']);
+      Object.values(queues).forEach(function (q) {
+        if (!q) return;
+        var u = queueSeniorOf(q, users);
+        L.push([
+          (u && u.name) || q.seniorName || q.applicantName || 'Senior',
+          q.seniorId || (u && u.seniorId) || 'N/A',
+          q.service || 'General Consultation',
+          q.queueNumber || 'N/A',
+          q.status || 'Pending',
+          q.date || (q.scheduledAt ? new Date(Number(q.scheduledAt)).toLocaleDateString() : '')
+        ]);
+      });
+      L.push([]);
+      L.push(['MONTHLY PENSION CONFIGURED']);
+      L.push(['Senior Name', 'OSCA ID', 'Monthly Amount', 'Set On', 'Set By']);
+      Object.values(users).forEach(function (u) {
+        if (!u || u.role !== 'senior' || !u.pensionAmount) return;
+        L.push([
+          u.name || 'Senior', u.seniorId || 'N/A', fmtPhp(u.pensionAmount),
+          u.pensionSetAt ? new Date(Number(u.pensionSetAt)).toLocaleDateString() : '',
+          u.pensionSetBy || ''
+        ]);
+      });
+      appendClaimedRows(L, claims);
+      var fname = 'SilverCare_Benefits_Report_' + d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0') + '.csv';
+      var csv = L.map(function (r) { return r.map(toCell).join(','); }).join('\r\n');
+      var blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob); a.download = fname;
+      document.body.appendChild(a); a.click();
+      setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+      if (window.scNotify) window.scNotify('success', 'Report generated — appointments + benefits totals included.');
+    } catch (e) { if (window.scNotify) window.scNotify('error', 'Report generation failed. Please try again.'); }
+  }
+
+  function appendClaimedRows(L, claims) {
+    L.push([]);
+    L.push(['CLAIMED ASSISTANCE']);
+    L.push(['Senior Name', 'OSCA ID', 'Service', 'Amount Paid', 'Reference #', 'Claimed On']);
+    Object.values(claims || {}).forEach(function (c) {
+      if (!c) return;
+      var st = String(c.status || '');
+      if (st !== 'Claimed' && st !== 'Paid') return;
+      L.push([
+        c.applicantName || 'Senior', c.seniorId || c.uid || 'N/A',
+        c.serviceType || 'Welfare',
+        fmtPhp(c.paidAmount),
+        c.refNumber || '',
+        c.paidAt ? new Date(Number(c.paidAt)).toLocaleDateString() : ''
+      ]);
+    });
   }
   function applySearch() {
     try {
@@ -171,6 +321,10 @@
     if (r) r.addEventListener('click', function () { renderClaimedPensions(); refreshCounts(); applySearch(); if (window.scNotify) window.scNotify('success', 'Board refreshed.'); });
     var x = $('processBenefitsExport');
     if (x) x.addEventListener('click', exportBoard);
+    var g = $('pbGenerateReport');
+    if (g) g.addEventListener('click', generateReportCsv);
+    var pr = $('pbPrintReport');
+    if (pr) pr.addEventListener('click', function () { window.print(); });
     var p = $('processBenefitsPrint');
     if (p) p.addEventListener('click', function () { window.print(); });
     toggleRow('pbPendingToggle', 'pbPendingBody', 'pbPendingChevron', 'pbPendingHint');

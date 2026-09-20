@@ -34,6 +34,7 @@
             </a>
             <a class="nav-pill" onclick="switchTab('face', this)">Face</a>
             <a class="nav-pill" onclick="switchTab('settings', this)">Settings</a>
+            <a class="nav-pill" onclick="switchTab('audit', this)">Audit Trail</a>
         </nav>
 
         <!-- Right Side User Menu -->
@@ -671,6 +672,52 @@
             </div>
         </div>
 
+    <!-- TAB 6: AUDIT TRAIL — admin-only system activity log -->
+        <div id="tab-audit" class="tab-content" style="display: none;">
+            <div style="background: white; padding: 25px; border-radius: 12px; margin-bottom: 30px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; border-bottom: 2px solid #1e293b; padding-bottom: 15px;">
+                    <div>
+                        <h3 style="margin: 0; color: #1e293b; font-size: 1.2rem;"><i class="fas fa-clipboard-list" style="color: #3b82f6; margin-right: 8px;"></i>Audit Trail</h3>
+                        <p style="margin: 5px 0 0; color: #52525b; font-size: 0.85rem;">Complete system activity trail — every staff action, pension change, claim, and login. Visible to the admin account only.</p>
+                    </div>
+                    <span id="auditCount" style="background: #f1f5f9; color: #475569; padding: 6px 14px; border-radius: 20px; font-weight: 700; font-size: 0.8rem;"></span>
+                </div>
+
+                <!-- Controls -->
+                <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 18px;">
+                    <input id="auditSearch" type="text" placeholder="Search actor, action, detail..." aria-label="Search audit trail"
+                        style="flex: 1 1 240px; min-width: 200px; padding: 9px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.88rem;">
+                    <select id="auditActionFilter" aria-label="Filter by action"
+                        style="padding: 9px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.88rem; background: white; color: #1e293b;">
+                        <option value="all">All actions</option>
+                    </select>
+                    <select id="auditLimit" aria-label="Number of entries to load"
+                        style="padding: 9px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.88rem; background: white; color: #1e293b;">
+                        <option value="100">Latest 100</option>
+                        <option value="200" selected>Latest 200</option>
+                        <option value="500">Latest 500</option>
+                    </select>
+                    <button type="button" id="auditRefreshBtn" title="Reload audit trail"
+                        style="background: #1e293b; color: #ffffff; border: none; padding: 9px 16px; border-radius: 6px; font-weight: 600; font-size: 0.85rem; cursor: pointer;">
+                        <i class="fas fa-rotate"></i> Refresh
+                    </button>
+                    <button type="button" id="auditExportBtn" title="Download audit trail as CSV"
+                        style="background: #ffffff; color: #1e293b; border: 1px solid #cbd5e1; padding: 9px 16px; border-radius: 6px; font-weight: 600; font-size: 0.85rem; cursor: pointer;">
+                        <i class="fas fa-file-csv"></i> Export CSV
+                    </button>
+                    <button type="button" id="auditPrintBtn" title="Print audit trail"
+                        style="background: #ffffff; color: #1e293b; border: 1px solid #cbd5e1; padding: 9px 16px; border-radius: 6px; font-weight: 600; font-size: 0.85rem; cursor: pointer;">
+                        <i class="fas fa-print"></i> Print
+                    </button>
+                </div>
+
+                <!-- Audit entries table -->
+                <div id="auditTableContainer" style="max-height: 620px; overflow-y: auto; border: 1px solid #e4e4e7; border-radius: 8px; background: #fff;">
+                    <div style="text-align: center; color: #71717a; padding: 30px;">Loading audit trail...</div>
+                </div>
+            </div>
+        </div>
+
     </div>
 
     <!-- Chart.js (same version already used on employee dashboard) -->
@@ -698,6 +745,12 @@
             if (tabId === 'users') {
                 const badge = document.getElementById('adminUsersBadge');
                 if (badge) badge.style.display = 'none';
+            }
+
+            // Audit Trail: (re)load the log every time the tab is opened so
+            // the admin always sees the freshest system activity.
+            if (tabId === 'audit' && window.loadAdminAuditLogs) {
+                window.loadAdminAuditLogs();
             }
         }
     </script>

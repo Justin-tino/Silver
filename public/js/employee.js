@@ -63,6 +63,28 @@ async function logTransaction(type, seniorName, seniorUid, amount, refNumber = '
     }
 }
 
+// Helper: Write a pension audit-trail entry (shown on the Admin Audit Trail —
+// admin account only). `pension` is stored as an INT so the admin can audit
+// the exact peso amount of every pension set / change / removal.
+async function logPensionAudit(action, seniorUid, seniorName, amount, detail) {
+    try {
+        const key = 'audit_' + Date.now() + Math.random().toString(36).substring(2, 7);
+        await update(ref(db, `auditLogs/${key}`), {
+            action: action,
+            actorUid: (auth.currentUser && auth.currentUser.uid) || 'staff',
+            actorRole: window.currentStaffRole || 'employee',
+            actorName: (window.currentStaffName || '').trim() || 'OSCA Staff',
+            targetUid: seniorUid || null,
+            docId: null,
+            pension: Math.round(Number(amount) || 0),
+            detail: detail || null,
+            timestamp: Date.now()
+        });
+    } catch (e) {
+        console.error('Failed to write pension audit log:', e);
+    }
+}
+
 // ============================================================
 // Face-Scan Reactivation Requests (Archive tab — staff review)
 // Staff compare the live photo with the registration photo and
@@ -615,6 +637,8 @@ document.addEventListener('DOMContentLoaded', () => {
             onValue(ref(db, 'users'), (snapshot) => {
                 const data = snapshot.exists() ? snapshot.val() : {};
                 renderEmployeeDashboard(data);
+                // Process Benefits "Generate Reports" totals live-update here
+                if (window.updatePbReportStats) window.updatePbReportStats();
                 if (window.renderEmployeeNotifications) window.renderEmployeeNotifications();
             });
 
@@ -625,6 +649,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 renderClaimsDashboard(claimsData);
                 renderEmpOverviewDashboard();
                 renderPrioritySeniorsDashboard();
+                // Process Benefits "Generate Reports" totals live-update here
+                if (window.updatePbReportStats) window.updatePbReportStats();
                 if (window.renderEmployeeNotifications) window.renderEmployeeNotifications();
             });
 
@@ -637,6 +663,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (window.lastUsersData) {
                     renderSeniorAppointmentRequests(window.lastUsersData, window.lastQueuesData);
                 }
+                // Process Benefits "Generate Reports" totals live-update here
+                if (window.updatePbReportStats) window.updatePbReportStats();
                 updateHealthTabBadge();
                 if (window.renderEmployeeNotifications) window.renderEmployeeNotifications();
             });
@@ -2291,6 +2319,8 @@ function renderPensionSetup(usersData) {
                         pensionSetAt: Date.now(),
                         pensionSetBy: actorName
                     });
+                    logPensionAudit('PENSION_SET', uid, seniorName, amount,
+                        `Set monthly pension of ${seniorName} to PHP ${amount.toLocaleString()}`);
                     scNotify('success', `Monthly pension of PHP ${amount.toLocaleString()} set for ${seniorName}.`);
                 } catch (err) {
                     console.error('Pension setup error:', err);
@@ -2312,6 +2342,8 @@ function renderPensionSetup(usersData) {
                         pensionSetAt: null,
                         pensionSetBy: null
                     });
+                    logPensionAudit('PENSION_REMOVED', uid, seniorName, 0,
+                        `Removed monthly pension setup for ${seniorName}`);
                     scNotify('success', `Pension setup removed for ${seniorName}.`);
                 } catch (err) {
                     console.error('Pension removal error:', err);
@@ -2356,6 +2388,8 @@ function renderPensionSetup(usersData) {
                             pensionSetAt: Date.now(),
                             pensionSetBy: actorName
                         });
+                        logPensionAudit('PENSION_UPDATED', uid, seniorName, amount,
+                            `Changed monthly pension of ${seniorName} to PHP ${amount.toLocaleString()}`);
                         scNotify('success', `Monthly pension of ${seniorName} changed to PHP ${amount.toLocaleString()}.`);
                     } catch (err) {
                         console.error('Pension edit error:', err);

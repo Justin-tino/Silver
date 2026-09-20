@@ -2036,6 +2036,221 @@ function calculatePriorityLevelAdmin(user) {
 window.currentAdminPriorityFilter = 'all';
 window.showAllSeniorsAdmin = false;
 
+// ── Audit Trail (admin-only) ─────────────────────────────────────────────────
+// Reads the auditLogs node through the admin-only /api/audit-logs endpoint
+// (requireRole('admin')) and renders the full system activity trail: who did
+// what, to whom, and when — including pension changes (logged with `pension`
+// as an INT so exact amounts are auditable). Access is enforced server-side
+// and by database.rules.json (auditLogs read = admin only).
+let auditLogsCache = [];
+
+function auditFriendlyAction(action) {
+    return String(action || 'EVENT').split('_')
+        .map(w => (w ? w.charAt(0) + w.slice(1).toLowerCase() : w))
+        .join(' ');
+}
+
+function auditFormatTs(ts) {
+    if (!ts) return '—';
+    const d = new Date(Number(ts));
+    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) +
+        ' · ' + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+}
+
+function auditRoleBadge(role) {
+    const r = String(role || 'system').toLowerCase();
+    const map = {
+        admin: ['#eef2ff', '#4338ca'],
+        employee: ['#ecfeff', '#0e7490'],
+        senior: ['#f0fdf4', '#166534'],
+        system: ['#f1f5f9', '#475569']
+    };
+    const pair = map[r] || map.system;
+    return `<span style="background:${pair[0]}; color:${pair[1]}; padding:2px 10px; border-radius:20px; font-weight:700; font-size:0.72rem; text-transform:uppercase;">${scEscapeHtml(r)}</span>`;
+}
+
+function auditActionChip(action) {
+    const a = String(action || 'EVENT');
+    let bg = '#f1f5f9', color = '#334155';
+    if (/PENSION/i.test(a)) { bg = '#fef9c3'; color = '#854d0e'; }
+    else if (/LOGIN|2FA|PASSWORD/i.test(a)) { bg = '#eef2ff'; color = '#4338ca'; }
+    else if (/CLAIM|BENEFIT|BUDGET/i.test(a)) { bg = '#f0fdf4'; color = '#166534'; }
+    else if (/REJECT|DECLIN|FAIL|BLOCK|DENIED/i.test(a)) { bg = '#fef2f2'; color = '#b91c1c'; }
+    else if (/HEALTH|PRIORITY/i.test(a)) { bg = '#ecfeff'; color = '#0e7490'; }
+    return `<span style="background:${bg}; color:${color}; border:1px solid ${color}33; padding:2px 10px; border-radius:4px; font-weight:700; font-size:0.74rem; white-space:nowrap;">${scEscapeHtml(auditFriendlyAction(a))}</span>`;
+}
+
+window.loadAdminAuditLogs = async function () {
+    const container = document.getElementById('auditTableContainer');
+    if (!container) return;
+    try {
+        const token = await auth.currentUser.getIdToken();
+        const limitSel = document.getElementById('auditLimit');
+        const limit = limitSel ? limitSel.value : 200;
+        const res = await fetch(`/api/audit-logs?limit=${encodeURIComponent(limit)}`, {
+            headers: { Authorization: 'Bearer ' + token }
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) throw new Error(data.message || 'Failed to load audit logs.');
+        auditLogsCache = Array.isArray(data.logs) ? data.logs : [];
+        renderAuditLogs();
+    } catch (err) {
+        console.error('Audit trail load error:', err);
+        container.innerHTML = `<div style="text-align:center; color:#ef4444; padding:30px;">
+            Failed to load the audit trail. <button id="auditRetryBtn"
+            style="margin-left:6px; border:1px solid #cbd5e1; background:white; border-radius:6px; padding:6px 14px; cursor:pointer; font-weight:700;">Retry</button></div>`;
+        const retry = document.getElementById('auditRetryBtn');
+        if (retry) retry.onclick = () => window.loadAdminAuditLogs();
+    }
+};
+
+function auditFilterLogs() {
+    const search = (document.getElementById('auditSearch')?.value || '').toLowerCase().trim();
+    const actionFilter = (document.getElementById('auditActionFilter')?.value || 'all');
+    return auditLogsCache.filter(l => {
+        if (actionFilter !== 'all' && String(l.action || 'EVENT') !== actionFilter) return false;
+        if (!search) return true;
+        const hay = `${l.actorName || ''} ${l.actorRole || ''} ${l.action || ''} ${l.detail || ''} ${l.targetUid || ''} ${l.docId || ''}`.toLowerCase();
+        return hay.includes(search);
+    });
+}
+
+function renderAuditLogs() {
+    const container = document.getElementById('auditTableContainer');
+    if (!container) return;
+
+    // Rebuild action filter options from the loaded entries (keeps selection).
+    const sel = document.getElementById('auditActionFilter');
+    if (sel) {
+        const actions = Array.from(new Set(auditLogsCache.map(l => String(l.action || 'EVENT')))).sort();
+        const prev = sel.value;
+        sel.innerHTML = '<option value="all">All actions</option>' +
+            actions.map(a => `<option value="${scEscapeHtml(a)}">${scEscapeHtml(auditFriendlyAction(a))}</option>`).join('');
+        if (actions.includes(prev)) sel.value = prev;
+        else if (prev && prev !== 'all') sel.value = 'all';
+    }
+
+    const filtered = auditFilterLogs();
+
+    const countEl = document.getElementById('auditCount');
+    if (countEl) countEl.textContent = `${filtered.length} of ${auditLogsCache.length} entries`;
+
+    if (!filtered.length) {
+        container.innerHTML = `<div style="text-align:center; color:#71717a; padding:36px;">
+            <i class="fas fa-clipboard-list" style="font-size:2rem; margin-bottom:10px; display:block; opacity:0.4;"></i>
+            ${auditLogsCache.length ? 'No audit entries match the selected filters.' : 'No audit entries recorded yet.'}
+        </div>`;
+        return;
+    }
+
+    container.innerHTML = `<div style="overflow-x:auto;"><table style="width:100%; border-collapse:collapse; font-size:0.85rem; min-width:900px;">
+        <thead>
+            <tr style="border-bottom:2px solid #1e293b; color:#52525b; text-align:left;">
+                <th style="padding:10px 12px; font-weight:600; white-space:nowrap;">Timestamp</th>
+                <th style="padding:10px 12px; font-weight:600;">Actor</th>
+                <th style="padding:10px 12px; font-weight:600;">Role</th>
+                <th style="padding:10px 12px; font-weight:600;">Action</th>
+                <th style="padding:10px 12px; font-weight:600;">Target / Reference</th>
+                <th style="padding:10px 12px; font-weight:600;">Details</th>
+            </tr>
+        </thead>
+        <tbody>
+            ${filtered.map(auditRowHtml).join('')}
+        </tbody>
+    </table></div>`;
+}
+
+function auditRowHtml(log) {
+    const pension = (log.pension !== undefined && log.pension !== null && !isNaN(Number(log.pension))) ? Number(log.pension) : null;
+    const pensionChip = pension !== null
+        ? ` <span style="background:#fef9c3; color:#854d0e; border:1px solid #fde047; padding:1px 8px; border-radius:4px; font-weight:700; font-size:0.74rem; white-space:nowrap;">Pension: ₱${pension.toLocaleString()}</span>`
+        : '';
+    const target = log.docId || log.targetUid || '—';
+    return `<tr style="border-bottom:1px solid #f1f5f9;">
+        <td style="padding:10px 12px; color:#3f3f46; white-space:nowrap;">${scEscapeHtml(auditFormatTs(log.timestamp))}</td>
+        <td style="padding:10px 12px; font-weight:600; color:#1e293b;">${scEscapeHtml(log.actorName || 'Unknown')}</td>
+        <td style="padding:10px 12px;">${auditRoleBadge(log.actorRole)}</td>
+        <td style="padding:10px 12px;">${auditActionChip(log.action)}${pensionChip}</td>
+        <td style="padding:10px 12px; color:#3f3f46; font-family:monospace; font-size:0.78rem; overflow-wrap:anywhere;">${scEscapeHtml(target)}</td>
+        <td style="padding:10px 12px; color:#3f3f46;">${scEscapeHtml(log.detail || '—')}</td>
+    </tr>`;
+}
+
+window.exportAuditCsv = function () {
+    try {
+        const logs = auditFilterLogs();
+        if (!logs.length) {
+            scNotify('warning', 'No audit entries to export.');
+            return;
+        }
+        const toCell = (v) => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+        const rows = [['Timestamp', 'Actor', 'Role', 'Action', 'Pension (int)', 'Target / Reference', 'Details']];
+        logs.forEach(l => {
+            const pension = (l.pension !== undefined && l.pension !== null && !isNaN(Number(l.pension))) ? Number(l.pension) : '';
+            rows.push([auditFormatTs(l.timestamp), l.actorName || 'Unknown', l.actorRole || 'system', l.action || 'EVENT', pension, l.docId || l.targetUid || '', l.detail || '']);
+        });
+        const csv = rows.map(r => r.map(toCell).join(',')).join('\r\n');
+        const d = new Date();
+        const fname = `SilverCare_Audit_Trail_${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}.csv`;
+        scDownloadBlob(new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' }), fname);
+        scNotify('success', `Audit trail exported (${logs.length} entries).`);
+    } catch (err) {
+        console.error('Audit CSV export error:', err);
+        scNotify('error', 'Export failed. Please try again.');
+    }
+};
+
+window.printAuditTrail = function () {
+    try {
+        const logs = auditFilterLogs();
+        if (!logs.length) {
+            scNotify('warning', 'No audit entries to print.');
+            return;
+        }
+        const w = window.open('', '_blank', 'width=1100,height=750');
+        if (!w) {
+            scNotify('warning', 'Please allow pop-ups to print the audit trail.');
+            return;
+        }
+        let html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>SilverCare Audit Trail</title>';
+        html += '<style>body{font-family:Arial,sans-serif;color:#1e293b;padding:26px;}h1{font-size:19px;margin:0;}p.meta{color:#64748b;font-size:12px;}table{width:100%;border-collapse:collapse;margin-top:14px;font-size:11px;}th{background:#1e293b;color:#fff;padding:7px;border:1px solid #1e293b;text-align:left;}td{padding:6px 7px;border:1px solid #cbd5e1;}</style>';
+        html += '</head><body>';
+        html += '<h1>SilverCare — OSCA Magalang · Audit Trail</h1>';
+        html += `<p class="meta">Generated: ${scEscapeHtml(scReportStamp())} · ${logs.length} entries · Admin access only</p>`;
+        html += '<table><thead><tr><th>Timestamp</th><th>Actor</th><th>Role</th><th>Action</th><th>Pension</th><th>Target / Reference</th><th>Details</th></tr></thead><tbody>';
+        logs.forEach(l => {
+            const pension = (l.pension !== undefined && l.pension !== null && !isNaN(Number(l.pension))) ? '₱' + Number(l.pension).toLocaleString() : '';
+            html += `<tr><td>${scEscapeHtml(auditFormatTs(l.timestamp))}</td><td>${scEscapeHtml(l.actorName || 'Unknown')}</td><td>${scEscapeHtml(l.actorRole || 'system')}</td><td>${scEscapeHtml(l.action || 'EVENT')}</td><td>${scEscapeHtml(pension)}</td><td>${scEscapeHtml(l.docId || l.targetUid || '—')}</td><td>${scEscapeHtml(l.detail || '—')}</td></tr>`;
+        });
+        html += '</tbody></table></body></html>';
+        w.document.write(html);
+        w.document.close();
+        w.focus();
+        setTimeout(() => { try { w.print(); } catch (e) { /* user can print manually */ } }, 350);
+    } catch (err) {
+        console.error('Audit print error:', err);
+        scNotify('error', 'Print failed. Please try again.');
+    }
+};
+
+// Wire the audit trail controls (safe to call — elements exist only on /admin).
+(function wireAuditTrailControls() {
+    const wire = () => {
+        const refresh = document.getElementById('auditRefreshBtn');
+        const exportBtn = document.getElementById('auditExportBtn');
+        const printBtn = document.getElementById('auditPrintBtn');
+        const search = document.getElementById('auditSearch');
+        const actionFilter = document.getElementById('auditActionFilter');
+        if (refresh) refresh.addEventListener('click', () => window.loadAdminAuditLogs());
+        if (exportBtn) exportBtn.addEventListener('click', () => window.exportAuditCsv());
+        if (printBtn) printBtn.addEventListener('click', () => window.printAuditTrail());
+        if (search) search.addEventListener('input', () => renderAuditLogs());
+        if (actionFilter) actionFilter.addEventListener('change', () => renderAuditLogs());
+    };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', wire);
+    else wire();
+})();
+
 window.toggleAdminSeeAllSeniors = function() {
     window.showAllSeniorsAdmin = !window.showAllSeniorsAdmin;
     const btn = document.getElementById('adminToggleSeeAllBtn');
