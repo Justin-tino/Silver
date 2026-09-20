@@ -1914,15 +1914,19 @@ app.post('/api/health-report/submit', requireAuth, requireRole('senior'), async 
         const reportRef = admin.database().ref(`users/${actor.uid}/healthReports`).push();
         const reportId = reportRef.key;
 
-        // 1) Store the physical certification first (private bucket, pending folder)
+        // 1) Store the physical certification first (private bucket, pending
+        //    folder). The folder is keyed by the senior's UNIQUE OSCA ID
+        //    number — only senior certifications ever live in this vault.
         let storagePath = null;
         let fileSize = null;
+        let certFolderKey = null;
         if (wantsFile) {
             if (!medicalVault.isVaultEnabled()) return medicalVaultDisabled(res);
             const decoded = medicalVault.decodeDocumentPayload(mimeType, fileBase64);
             if (decoded.error) return res.status(400).json({ success: false, message: decoded.error });
             fileSize = decoded.buffer.length;
-            storagePath = medicalVault.buildStoragePath('pending', actor.uid, reportId, fileName);
+            certFolderKey = medicalVault.resolveSeniorFolderKey(actor);
+            storagePath = medicalVault.buildStoragePath('pending', certFolderKey, reportId, fileName);
             await medicalVault.uploadDocument(storagePath, decoded.buffer, mimeType);
         }
 
@@ -1939,6 +1943,7 @@ app.post('/api/health-report/submit', requireAuth, requireRole('senior'), async 
             mimeType: wantsFile ? mimeType : null,
             size: fileSize,
             storagePath: storagePath,
+            certFolderKey: certFolderKey,
             folder: wantsFile ? 'pending' : null,
             status: 'Pending Review',
             submittedBy: actor.uid,
@@ -2105,6 +2110,14 @@ app.post('/api/health-report/:uid/:reportId/review', requireAuth, requireRole('a
             return res.status(409).json({ success: false, message: `This health update was already reviewed (${report.status}).` });
         }
 
+        // Seniors only — the medical-certification vault must never hold
+        // files for any other account type.
+        const ownerSnap = await admin.database().ref(`users/${uid}`).once('value');
+        const owner = ownerSnap.val() || null;
+        if (!owner || (owner.role && owner.role !== 'senior')) {
+            return res.status(404).json({ success: false, message: 'No senior account was found for this health update.' });
+        }
+
         const actorName = actor.name || actor.email || 'OSCA Staff';
         const cleanNotes = String(notes || '').trim().slice(0, 500) || null;
 
@@ -2148,7 +2161,7 @@ app.post('/api/health-report/:uid/:reportId/review', requireAuth, requireRole('a
         // Move the accepted certification to the reviewed folder BEFORE touching Firebase.
         let reviewedPath = report.storagePath || null;
         if (report.storagePath) {
-            const target = medicalVault.buildStoragePath('reviewed', uid, reportId, report.fileName || 'certification');
+            const target = medicalVault.buildStoragePath('reviewed', report.certFolderKey || medicalVault.resolveSeniorFolderKey(owner), reportId, report.fileName || 'certification');
             try {
                 await medicalVault.moveDocument(report.storagePath, target);
                 reviewedPath = target;
