@@ -1898,8 +1898,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     ? `🚨 URGENT ${activeServiceType.toUpperCase()} request submitted! OSCA staff will prioritize it.`
                     : `Assistance request for ${activeServiceType.toUpperCase()} submitted successfully!`);
 
-                // Auto-download the DOCX copy for client's record!
-                triggerDocxDownload();
+                // Auto-open the PDF copy for client's record!
+                triggerPdfDownload();
 
                 // Go back to dashboard after 2 seconds
                 setTimeout(() => {
@@ -1918,24 +1918,24 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // --- Download .docx Button Click ---
+    // --- Download .pdf Button Click ---
     const formDownloadBtn = document.getElementById('formDownloadBtn');
     if (formDownloadBtn) {
         formDownloadBtn.addEventListener('click', (e) => {
             e.preventDefault();
-            triggerDocxDownload();
+            triggerPdfDownload();
         });
     }
 
-    // --- Word Document Template Generator & Download ---
-    function triggerDocxDownload() {
+    // --- PDF Form Template Generator & Download (print to PDF, no new dependencies) ---
+    function triggerPdfDownload() {
         const service = activeServiceType;
-        let filename = 'SilverCare_Application.doc';
+        let filename = 'SilverCare_Application.pdf';
         let docTitle = 'SilverCare Application Form';
         let bodyHtml = '';
 
         if (service === 'burial') {
-            filename = 'SilverCare_Burial_Assistance_Form.doc';
+            filename = 'SilverCare_Burial_Assistance_Form.pdf';
             docTitle = 'Burial Assistance Claim Form';
 
             const decName = document.getElementById('deceasedName')?.value || '_______________________';
@@ -2021,7 +2021,7 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
         }
         else if (service === 'bedridden') {
-            filename = 'SilverCare_Bedridden_Assistance_Form.doc';
+            filename = 'SilverCare_Bedridden_Assistance_Form.pdf';
             docTitle = 'Bedridden Senior Assessment Form';
 
             const name = document.getElementById('bedriddenName')?.value || '_______________________';
@@ -2120,7 +2120,7 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
         }
         else if (service === 'octogenarian' || service === 'centarian') {
-            filename = `SilverCare_${service.toUpperCase()}_Benefit_AnnexA.doc`;
+            filename = `SilverCare_${service.toUpperCase()}_Benefit_AnnexA.pdf`;
             docTitle = 'NCSC Annex A Benefit Claim Form';
 
             const rrn = document.getElementById('ncscRrn')?.value || 'N/A';
@@ -2267,22 +2267,31 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Call helper
-        downloadWordDoc(filename, docTitle, bodyHtml);
+        downloadPdfForm(filename, docTitle, bodyHtml);
     }
 
-    // --- Helper function for word file generation ---
-    function downloadWordDoc(filename, title, htmlBody) {
-        const header = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
-        <head><title>${title}</title>
-        <!--[if gte mso 9]><xml>
-        <w:WordDocument>
-        <w:View>Print</w:View>
-        <w:Zoom>100</w:Zoom>
-        <w:DoNotOptimizeForBrowser/>
-        </w:WordDocument>
-        </xml><![endif]-->
+    // --- Helper: open a print-friendly window so the user saves it as PDF ---
+    // Uses the browser print dialog (Destination -> Save as PDF) with zero new
+    // dependencies — same pattern as the admin report PDF export.
+    function escapeFormHtml(value) {
+        return String(value == null ? '' : value)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    function downloadPdfForm(filename, title, htmlBody) {
+        const w = window.open('', '_blank', 'width=1000,height=750');
+        if (!w) {
+            showToast('Please allow pop-ups to download the PDF form.');
+            return;
+        }
+        const safeTitle = escapeFormHtml(title);
+        const safeFilename = escapeFormHtml(filename);
+        const header = `<!DOCTYPE html>
+        <html>
+        <head><meta charset="utf-8"><title>${safeTitle}</title>
         <style>
-            body { font-family: 'Arial', sans-serif; font-size: 11pt; color: #333333; line-height: 1.5; padding: 40px; }
+            body { font-family: 'Arial', sans-serif; font-size: 11pt; color: #333333; line-height: 1.5; padding: 32px; }
             h1, h2, h3 { color: #1e3a8a; margin-top: 5px; margin-bottom: 5px; }
             h1 { font-size: 16pt; }
             h2 { font-size: 13pt; }
@@ -2295,21 +2304,25 @@ document.addEventListener('DOMContentLoaded', () => {
             ul { margin-top: 5px; margin-bottom: 5px; padding-left: 20px; }
             li { font-size: 10pt; line-height: 1.4; margin-bottom: 4px; }
             p { font-size: 10pt; margin-top: 5px; margin-bottom: 10px; }
+            .pdf-hint { margin-top: 22px; color: #64748b; font-size: 10pt; }
+            @media print {
+                .pdf-hint { display: none; }
+                body { padding: 0; }
+                @page { size: A4; margin: 14mm; }
+            }
         </style>
         </head>
         <body>
             ${htmlBody}
+            <p class="pdf-hint">In the print dialog, choose <strong>Save as PDF</strong> as the destination to save <strong>${safeFilename}</strong>.</p>
         </body>
         </html>`;
 
-        const blob = new Blob(['\ufeff' + header], { type: 'application/msword' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        w.document.write(header);
+        w.document.close();
+        w.focus();
+        try { w.document.title = filename; } catch (e) { /* title hint only */ }
+        setTimeout(() => { try { w.print(); } catch (e) { /* user can print manually */ } }, 400);
     }
 
     // --- Toast Handler ---
