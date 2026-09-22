@@ -2192,6 +2192,38 @@ window.closePrioritySeniorModal = function() {
     if (modal) modal.style.display = 'none';
 };
 
+// ── Senior pension decision notices (in-app + e-mail) ────────────────────────
+// Staff pension actions (set / change / remove) now reach the senior twice:
+//   1. an in-app notification on their portal, and
+//   2. the official status e-mail via /api/send-status-email (server.js renders
+//      the same pension_approved / pension_declined templates used elsewhere).
+// Both are best-effort and non-blocking — a failed e-mail never blocks the save.
+function sendSeniorPensionStatus(seniorsArr, uid, seniorName, amount, type) {
+    try {
+        const approved = type === 'pension_approved';
+        update(ref(db, `users/${uid}/notifications/notif_${Date.now()}`), {
+            title: approved ? 'Monthly Pension Approved' : 'Monthly Pension Setup Removed',
+            description: approved
+                ? `Your monthly pension of PHP ${Number(amount).toLocaleString()} has been approved by OSCA staff. Please check your email for the official notice.`
+                : 'Your monthly pension setup was removed by OSCA staff. Please visit the OSCA Magalang office for assistance.',
+            createdAt: Date.now()
+        }).catch(console.error);
+
+        const senior = (seniorsArr || []).find(s => s && s.uid === uid);
+        if (senior && senior.email) {
+            auth.currentUser.getIdToken().then(token => {
+                return fetch('/api/send-status-email', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+                    body: JSON.stringify({ email: senior.email, name: seniorName, amount: String(amount || 0), type })
+                });
+            }).catch(console.error);
+        }
+    } catch (e) {
+        console.error('Pension status notify error:', e);
+    }
+}
+
 // ── Monthly Pension Setup (Process Benefits) ──────────────────────────────────
 // Verified seniors are listed; employees set the exact monthly pension amount.
 // A senior "has a pension" once users/{uid}/pensionAmount is set.
@@ -2322,6 +2354,8 @@ function renderPensionSetup(usersData) {
                     logPensionAudit('PENSION_SET', uid, seniorName, amount,
                         `Set monthly pension of ${seniorName} to PHP ${amount.toLocaleString()}`);
                     scNotify('success', `Monthly pension of PHP ${amount.toLocaleString()} set for ${seniorName}.`);
+                    // Notify the senior in-app + official e-mail (best-effort)
+                    sendSeniorPensionStatus(seniors, uid, seniorName, amount, 'pension_approved');
                 } catch (err) {
                     console.error('Pension setup error:', err);
                     scNotify('error', 'Failed to save pension: ' + err.message);
@@ -2345,6 +2379,8 @@ function renderPensionSetup(usersData) {
                     logPensionAudit('PENSION_REMOVED', uid, seniorName, 0,
                         `Removed monthly pension setup for ${seniorName}`);
                     scNotify('success', `Pension setup removed for ${seniorName}.`);
+                    // Notify the senior in-app + official e-mail (best-effort)
+                    sendSeniorPensionStatus(seniors, uid, seniorName, 0, 'pension_declined');
                 } catch (err) {
                     console.error('Pension removal error:', err);
                     scNotify('error', 'Failed to remove pension: ' + err.message);
@@ -2391,6 +2427,8 @@ function renderPensionSetup(usersData) {
                         logPensionAudit('PENSION_UPDATED', uid, seniorName, amount,
                             `Changed monthly pension of ${seniorName} to PHP ${amount.toLocaleString()}`);
                         scNotify('success', `Monthly pension of ${seniorName} changed to PHP ${amount.toLocaleString()}.`);
+                        // Notify the senior in-app + official e-mail (best-effort)
+                        sendSeniorPensionStatus(seniors, uid, seniorName, amount, 'pension_approved');
                     } catch (err) {
                         console.error('Pension edit error:', err);
                         scNotify('error', 'Failed to change pension: ' + err.message);
@@ -2910,8 +2948,23 @@ function openClaimDetailsModal(claimId, claim) {
                 createdAt: now
             });
 
+            // Send the official approval e-mail to the senior (best-effort,
+            // non-blocking) — same unified endpoint the decline flow uses.
+            try {
+                const userSnapshot = await get(ref(db, `users/${seniorUid}`));
+                if (userSnapshot.exists() && userSnapshot.val().email) {
+                    const userData = userSnapshot.val();
+                    const emailToken = await auth.currentUser.getIdToken();
+                    fetch('/api/send-status-email', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + emailToken },
+                        body: JSON.stringify({ email: userData.email, name: claim.applicantName, amount: '10000', type: 'claim_approved', refNumber: refNum, serviceType: serviceType })
+                    }).catch(console.error);
+                }
+            } catch (emailErr) { console.error('Claim approval e-mail error:', emailErr); }
+
             modal.style.display = 'none';
-            scNotify('success', 'Claim Approved! Sent to Process Benefits for payout & release.');
+            scNotify('success', 'Claim Approved! Senior notified in-app & by e-mail.');
 
         } catch (e) {
             scNotify('error', 'Approval failed: ' + e.message);

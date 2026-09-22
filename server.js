@@ -501,20 +501,20 @@ app.post('/api/send-status-email', requireAuth, requireRole('admin', 'employee')
     if (type === 'pension_approved') {
         title = 'Pension Payout Approved';
         subtitle = 'Official Monthly Pension Disbursement Notice';
-        statusTitle = 'Payout Status: Approved & Released';
-        statusText = `We are pleased to inform you that your monthly pension payout has been officially processed and approved by the OSCA administration.`;
+        statusTitle = 'Payout Status: Approved & Active';
+        statusText = `We are pleased to inform you that your monthly pension has been officially approved and activated by the OSCA administration. Your monthly pension of PHP ${amount || '1,500'} will be processed and released according to the official OSCA release schedule.`;
         sectionHtml = `
             <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 20px; text-align: center; margin: 25px 0;">
-                <p style="color: #166534; font-size: 0.9rem; margin: 0 0 5px 0; font-weight: 600;">Disbursed Amount</p>
+                <p style="color: #166534; font-size: 0.9rem; margin: 0 0 5px 0; font-weight: 600;">Approved Monthly Pension</p>
                 <span style="font-size: 2.2rem; font-weight: 800; color: #15803d; letter-spacing: -1px;">PHP ${amount || '1,500'}</span>
             </div>
             <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 25px; margin-top: 20px;">
-                <h3 style="color: #0f172a; margin-top: 0; font-size: 1.05rem;">Instructions to Claim:</h3>
+                <h3 style="color: #0f172a; margin-top: 0; font-size: 1.05rem;">What Happens Next:</h3>
                 <ul style="color: #475569; padding-left: 20px; font-size: 0.95rem; line-height: 1.6; margin-bottom: 0;">
-                    <li>Please bring your physical <strong>OSCA Identification Card</strong>.</li>
-                    <li>Proceed to the designated OSCA Magalang Distribution Center.</li>
-                    <li>Present this email or your online portal notification to the receiving officer.</li>
-                    <li>Unclaimed pensions will be forfeited after 30 days of this notice.</li>
+                    <li>Your monthly pension is now <strong>active</strong> under the OSCA Magalang pension program.</li>
+                    <li>Each monthly payout will be announced through your SilverCare portal notifications and e-mail.</li>
+                    <li>To receive a payout, present your physical <strong>OSCA Identification Card</strong> at the designated OSCA Magalang Distribution Center.</li>
+                    <li>For questions about the release schedule, please visit or contact the OSCA Magalang office.</li>
                 </ul>
             </div>`;
     } else if (type === 'pension_declined') {
